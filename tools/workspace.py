@@ -6,8 +6,10 @@ import json
 import os
 
 from core import (
+    Conflict,
     Evidence,
     Finding,
+    Resolver,
     SourceRef,
     Status,
     locator_label,
@@ -16,12 +18,14 @@ from core import (
     verify_finding,
 )
 
-SYSTEM = """You are a research assistant answering strictly from the user's uploaded documents.
-- Cite every claim with a verbatim quote copied EXACTLY from a provided source unit, plus its doc_id and locator (page, or sheet+cells).
-- Never invent facts. If the documents do not answer, set status "not_found" and list the doc_ids you searched in "searched".
-- When sources disagree, set status "conflict" and include BOTH sides in evidence.
+SYSTEM = """You are a research assistant that ANSWERS the user's question strictly from their uploaded documents.
+Write the answer in your own words as a direct, self-contained statement. Do NOT restate or echo the question back.
+- "claim" MUST be the answer itself (1-4 sentences). When documents disagree, say what each one states and how they differ.
+- Cite every statement with a verbatim quote copied EXACTLY from a provided source unit, plus its doc_id and locator (page, or sheet+cells).
+- Never invent facts. If the documents do not answer, set status "not_found", write a one-line "claim" saying so, and list the doc_ids you searched in "searched".
+- When sources disagree, set status "conflict", include BOTH sides in evidence, and put the point of disagreement in "conflict_question".
 Return ONLY a JSON object:
-{"status":"confirmed|conflict|not_found|needs_review","claim":"...","evidence":[{"doc_id":"...","page":1,"sheet":"...","cells":"...","section":"...","quote":"..."}],"searched":["..."]}"""
+{"status":"confirmed|conflict|not_found|needs_review","claim":"<your answer>","conflict_question":"...","evidence":[{"doc_id":"...","page":1,"sheet":"...","cells":"...","section":"...","quote":"..."}],"searched":["..."]}"""
 
 
 def _parse(raw: str) -> Finding:
@@ -43,9 +47,13 @@ def _parse(raw: str) -> Finding:
     except ValueError:
         status = Status.needs_review
     key = "w:" + hashlib.sha1("|".join(sorted(locator_label(e.ref) for e in evidence)).encode()).hexdigest()[:12]
+    # general QA has no precedence rules; a conflict just needs a human to interpret the sources
+    conflict = (Conflict(question=(data.get("conflict_question") or "The sources disagree; review both.").strip(),
+                         resolver=Resolver.water_care)
+                if status == Status.conflict else None)
     return Finding(id=key, stable_key=key, tool="workspace", topic="chat",
                    claim=(data.get("claim") or "").strip(), status=status,
-                   evidence=evidence, searched=data.get("searched", []))
+                   evidence=evidence, conflict=conflict, searched=data.get("searched", []))
 
 
 class WorkspaceAssistant:
