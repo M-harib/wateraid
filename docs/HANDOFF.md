@@ -37,3 +37,62 @@ The teammate-provided build-plan PDF, `docs/WORKSTREAMS.md`, and the concurrent 
 ## Review findings
 
 None recorded yet.
+
+---
+
+## Proposal workstream - 2026-10-17
+
+Branch: `feat/proposal`
+
+Built `tools/proposal/` as a checking-only view over the shared root-level core. It uses
+the real `core.llm`, dispatch, checks, pipeline, verifier, unit store and finding store;
+it does not import compliance or modify `core/schema.py`. The tool provides async
+`ask()`, `checklist()`, `reviewer_questions()`, `issues()` and `startup()` views.
+
+Implemented the proposal dispatch table, call/proposal checklist validation, code-side
+cost-share and duration comparisons, a new generic `callmatch` construction oracle,
+unsupported-claim grounding across files 02 and 04, PMF baseline/target checks, and
+file 06 reviewer-question mapping. Known-absent forms abstain, example/formula budget
+rows are excluded, quotations must verify, and exact quotes with a wrong model page ID
+are relocated only when the match is unique. Cache keys include sources, prompts,
+models, absent-source metadata, scenario date and question.
+
+Added Q5/Q21/Q23 gold entries and pack-specific evaluator coverage under `tests/eval/`.
+All ordinary unit inputs use made-up values; pack answers remain confined to eval.
+
+Commands actually run:
+
+- `git pull --ff-only origin main` - already up to date.
+- `uv sync --locked` - installed the pinned Python 3.13 environment.
+- `uv run pytest -q` - 102 passed after the final implementation.
+- `uv run pytest -q tests/test_proposal.py tests/eval/test_proposal_pack.py` - 47 passed
+  before the final candidate-hint adjustment; the later full run includes and passes them.
+- `uv run --env-file .env python -m tests.eval.run_proposal` plus targeted `--ids`
+  runs - Q5, Q21 and Q23 each passed live with their required verified citations;
+  Q5 and Q21 also passed deterministic comparison checks. Provider availability was
+  intermittent, so not every combined run passed all three together.
+- `uv run --env-file .env python -m tools.proposal --view reviewer ...` - passed live:
+  all 9 reviewer rows returned, 7 mapped and 2 explicitly not addressed, with verified
+  citations and no operational failures.
+- `uv run --env-file .env python -m tools.proposal --view quality ...` - passed live:
+  18 code-side PMF checks and 2 qualitative issues, 4 verified evidence rows, no
+  operational failures.
+- Live checklist runs reached extraction but failed strict quote verification on one
+  mandatory call quote (model-added ellipsis/duplicated word). The tool correctly
+  returned zero checklist rows plus an explicit failure rather than accepting a
+  non-verbatim funding-call rule.
+- CLI known-absent smoke test passed for the Local Partners form.
+
+Open integration/risk notes:
+
+- W4 still owns HTTP routes and camelCase API serialization. Browser/dashboard testing
+  is blocked until that layer mounts these functions; no browser provider was connected
+  in this session.
+- Checklist has deterministic/fixture coverage but still needs a successful live-model
+  run with every mandatory call quotation verbatim. Reviewer mapping and PMF quality
+  have successful live runs. `FakeLLM` pack tests validate the gate and citations, not
+  model recall.
+- The local OpenRouter key was moved from tracked `.env.example` into ignored `.env`
+  without printing it. Never commit `.env`.
+- Reviewer should inspect qualitative grounding precision, completeness of mandatory
+  checklist rows, construction classifications, and the proposal/API mapping before merge.
