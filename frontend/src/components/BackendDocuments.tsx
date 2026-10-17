@@ -1,12 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
-import { AlertCircle, ArrowRight, ArrowUpRight, CheckCircle2, FileSpreadsheet, FileText, Loader, Trash2, Upload } from 'lucide-react'
+import { AlertCircle, CheckCircle2, FileSpreadsheet, FileText, Loader, Trash2, Upload } from 'lucide-react'
 import {
-  askProjectQuestion,
   deleteProjectDocument,
   loadProjectDocuments,
   projectDocumentFileUrl,
   uploadProjectDocuments,
-  type AskAnswer,
   type ProjectDocument,
 } from '../api'
 
@@ -22,22 +20,17 @@ function StatusBadge({ doc }: { doc: ProjectDocument }) {
 
 export function BackendDocuments({ projectId, projectName, connected }: Props) {
   const [docs, setDocs] = useState<ProjectDocument[]>([])
-  const [ready, setReady] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
   const [dragging, setDragging] = useState(false)
-  const [question, setQuestion] = useState('')
-  const [asking, setAsking] = useState(false)
-  const [askError, setAskError] = useState('')
-  const [answer, setAnswer] = useState<AskAnswer | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (!connected) return
     let active = true
     loadProjectDocuments(projectId)
-      .then((r) => { if (active) { setDocs(r.documents); setReady(r.ready) } })
+      .then((r) => { if (active) setDocs(r.documents) })
       .catch((e) => { if (active) setError(e instanceof Error ? e.message : 'Could not load documents.') })
     return () => { active = false }
   }, [connected, projectId])
@@ -46,7 +39,7 @@ export function BackendDocuments({ projectId, projectName, connected }: Props) {
   useEffect(() => {
     if (!connected || !docs.some((d) => d.status === 'queued' || d.status === 'ingesting')) return
     const timer = window.setTimeout(async () => {
-      try { const r = await loadProjectDocuments(projectId); setDocs(r.documents); setReady(r.ready) } catch { /* retry next tick */ }
+      try { setDocs((await loadProjectDocuments(projectId)).documents) } catch { /* retry next tick */ }
     }, 1500)
     return () => window.clearTimeout(timer)
   }, [docs, connected, projectId])
@@ -56,32 +49,22 @@ export function BackendDocuments({ projectId, projectName, connected }: Props) {
     if (!files.length) return
     setUploading(true); setError(''); setNotice('')
     try {
-      const r = await uploadProjectDocuments(projectId, files)
-      setDocs(r.documents); setReady(r.ready)
+      setDocs((await uploadProjectDocuments(projectId, files)).documents)
       setNotice(`${files.length} file${files.length === 1 ? '' : 's'} uploaded — ingesting in the background.`)
     } catch (e) { setError(e instanceof Error ? e.message : 'Upload failed.') }
     finally { setUploading(false); setDragging(false); if (inputRef.current) inputRef.current.value = '' }
   }
 
   async function remove(docId: string) {
-    try { await deleteProjectDocument(projectId, docId); const r = await loadProjectDocuments(projectId); setDocs(r.documents); setReady(r.ready) }
-    catch (e) { setError(e instanceof Error ? e.message : 'Could not remove the document.') }
+    try {
+      await deleteProjectDocument(projectId, docId)
+      setDocs((await loadProjectDocuments(projectId)).documents)
+    } catch (e) { setError(e instanceof Error ? e.message : 'Could not remove the document.') }
   }
-
-  async function ask(event: React.FormEvent) {
-    event.preventDefault()
-    if (!question.trim()) return
-    setAsking(true); setAskError(''); setAnswer(null)
-    try { setAnswer(await askProjectQuestion(projectId, question.trim())) }
-    catch (e) { setAskError(e instanceof Error ? e.message : 'The analysis service is unavailable.') }
-    finally { setAsking(false) }
-  }
-
-  const nameFor = (id: string) => docs.find((d) => d.doc_id === id)?.filename ?? id
 
   return <div className="project-documents">
-    <div className="documents-heading"><div><span className="dashboard-eyebrow">PROJECT UPLOAD / {projectName.toUpperCase()}</span><h1>Upload &amp; analyze documents</h1><p>Upload PDFs, spreadsheets, or CSVs. They are ingested in the background; once ready you can ask questions grounded in them.</p></div></div>
-    {!connected && <div className="inline-error" role="alert">Connect the analysis service (set VITE_API_BASE_URL) to upload and analyze documents.</div>}
+    <div className="documents-heading"><div><span className="dashboard-eyebrow">PROJECT UPLOAD / {projectName.toUpperCase()}</span><h1>Upload documents</h1><p>Upload PDFs, spreadsheets, or CSVs. They are ingested in the background; once ready they are searchable from the evidence workspace.</p></div></div>
+    {!connected && <div className="inline-error" role="alert">Connect the analysis service (set VITE_API_BASE_URL) to upload documents.</div>}
     {(error || notice) && <div className={error ? 'inline-error' : 'draft-notice'} role={error ? 'alert' : 'status'}>{error || notice}</div>}
 
     <div className={`documents-drop ${dragging ? 'dragging' : ''}`}
@@ -104,18 +87,6 @@ export function BackendDocuments({ projectId, projectName, connected }: Props) {
           <button type="button" onClick={() => void remove(doc.doc_id)} aria-label={`Remove ${doc.filename}`}><Trash2 size={15} /></button>
         </div>
       </article>)}
-    </div>}
-
-    <form className="ask-composer" onSubmit={ask} style={{ marginTop: 22 }}>
-      <label htmlFor="workspace-upload-question">Ask these documents</label>
-      <textarea id="workspace-upload-question" rows={3} value={question} onChange={(e) => setQuestion(e.target.value)} placeholder={ready ? 'What do these documents say about…?' : 'Upload at least one document and wait for it to be ready.'} />
-      <div><span>{ready ? 'Answers are grounded in your uploaded documents with cited excerpts.' : 'Waiting for a ready document…'}</span>
-        <button className="solid-button" type="submit" disabled={!connected || !ready || !question.trim() || asking}>{asking ? 'Checking sources…' : 'Ask'} <ArrowRight size={15} /></button></div>
-    </form>
-    {askError && <div className="inline-error" role="alert">{askError}</div>}
-    {answer && <div className="answer-panel"><span className="dashboard-eyebrow">{answer.status.replaceAll('_', ' ')} · {answer.confidence.level.toUpperCase()} CONFIDENCE</span>
-      <p>{answer.answer}</p>
-      {answer.evidence.length > 0 && <div className="answer-sources">{answer.evidence.map((item, index) => <a key={`${item.documentId}-${index}`} href={projectDocumentFileUrl(projectId, item.documentId)} target="_blank" rel="noreferrer"><span><strong>{nameFor(item.documentId)}</strong>{item.excerpt && <em>“{item.excerpt}”</em>}</span><ArrowUpRight size={15} /></a>)}</div>}
     </div>}
   </div>
 }
