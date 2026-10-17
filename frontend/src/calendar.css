@@ -1,0 +1,66 @@
+/* Reporting calendar (sample data view). Colours use theme tokens; status colours follow docs/BRAND.md. */
+.rcal { display: flex; flex-direction: column; gap: 16px; }
+.rcal-sample { margin: 0; padding: 12px 14px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface-soft); color: var(--muted); font-size: 13px; line-height: 1.5; }
+.rcal-sample strong { color: var(--ink); }
+.rcal-layout { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start; }
+.rcal-picker { flex: 1 1 340px; min-width: 0; max-width: 440px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 14px; }
+.rcal-detail { flex: 999 1 420px; min-width: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 22px; display: flex; flex-direction: column; gap: 12px; }
+.rcal-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.rcal-toolbar h2 { margin: 0; font-size: 17px; font-weight: 600; color: var(--ink); }
+.rcal-nav { width: 44px; height: 44px; display: grid; place-items: center; border: 1px solid var(--border); border-radius: 7px; background: var(--surface-raised); color: var(--ink); }
+.rcal-nav:hover { border-color: var(--accent); background: var(--accent-soft); }
+.rcal-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.rcal-weekday { text-align: center; font-size: 12px; font-weight: 600; color: var(--muted); padding-bottom: 4px; }
+.rcal-day { position: relative; aspect-ratio: 1; min-height: 40px; border: 1px solid transparent; border-radius: 8px; background: transparent; color: var(--ink); font-size: 14px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
+.rcal-day:hover { background: var(--surface-soft); border-color: var(--border); }
+.rcal-day.has-events { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+.rcal-day.as-of { border-color: var(--ink); }
+.rcal-day.selected { background: var(--button); color: var(--button-text); border-color: var(--button); }
+.rcal-day i { min-width: 16px; height: 16px; padding: 0 4px; border-radius: 999px; background: var(--accent); color: var(--surface); font-size: 11px; line-height: 16px; font-weight: 600; font-style: normal; }
+.rcal-day.selected i { background: var(--button-text); color: var(--button); }
+.rcal-jump { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.rcal-jump label { width: 100%; font-size: 13px; color: var(--muted); }
+.rcal-jump input { min-height: 44px; padding: 0 10px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface-raised); color: var(--ink); font: inherit; color-scheme: inherit; }
+.rcal-jump .outline-button { min-height: 44px; }
+.rcal-legend { display: flex; flex-wrap: wrap; gap: 14px; margin: 0; padding: 0; list-style: none; font-size: 12px; color: var(--muted); }
+.rcal-legend li { display: flex; align-items: center; gap: 6px; }
+.rcal-legend .dot { width: 12px; height: 12px; border-radius: 4px; display: inline-block; }
+.rcal-legend .dot.events { background: var(--accent-soft); border: 1px solid var(--accent); }
+.rcal-legend .dot.as-of { border: 1px solid var(--ink); }
+.rcal-month-list { display: flex; flex-direction: column; gap: 2px; padding-top: 6px; border-top: 1px solid var(--border); }
+.rcal-month-list .dashboard-eyebrow { margin: 6px 0; }
+.rcal-month-list button { display: flex; gap: 12px; align-items: center; min-height: 40px; padding: 6px 8px; border: 0; border-radius: 7px; background: transparent; color: var(--ink); text-align: left; font-size: 13px; }
+.rcal-month-list button:hover { background: var(--surface-soft); }
+.rcal-month-list strong { min-width: 22px; color: var(--accent); }
+.rcal-detail > h2 { margin: 0; font-size: 26px; font-weight: 500; letter-spacing: -.03em; color: var(--ink); }
+.rcal-empty { margin: 0; color: var(--muted); }
+.rcal-events { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 12px; }
+.rcal-event { border: 1px solid var(--border); border-radius: 10px; padding: 16px 18px; background: var(--surface-raised); display: flex; flex-direction: column; gap: 10px; }
+.rcal-event h3 { margin: 0; font-size: 17px; font-weight: 600; color: var(--ink); }
+.rcal-tags { display: flex; flex-wrap: wrap; gap: 6px; }
+.rcal-tag { font-size: 12px; padding: 3px 9px; border-radius: 999px; background: var(--surface-soft); color: var(--muted); border: 1px solid var(--border); }
+.rcal-tag.project { background: var(--accent-soft); color: var(--accent); border-color: transparent; font-weight: 600; }
+.rcal-tag.sample { border-style: dashed; }
+.rcal-tag.timing.passed { background: #f1f3f5; color: #4f5763; }
+.rcal-tag.timing.soon { background: #fdf3e1; color: #8a4b00; border-color: transparent; font-weight: 600; }
+.rcal-tag.timing.upcoming { background: #edf2fc; color: #245ac2; border-color: transparent; }
+html[data-theme='dark'] .rcal-tag.timing.passed { background: #22262d; color: #b0b7c2; }
+html[data-theme='dark'] .rcal-tag.timing.soon { background: #3a2c17; color: #f3c98b; }
+html[data-theme='dark'] .rcal-tag.timing.upcoming { background: #252f43; color: #a5c0f7; }
+.rcal-event dl { margin: 0; display: grid; gap: 6px; }
+.rcal-event dl > div { display: grid; grid-template-columns: 130px minmax(0, 1fr); gap: 10px; font-size: 14px; }
+.rcal-event dt { color: var(--muted); }
+.rcal-event dd { margin: 0; color: var(--ink); }
+.rcal-event dd small { color: var(--muted); }
+.rcal-note { margin: 0; padding: 10px 12px; border-radius: 8px; background: #fdf3e1; color: #8a4b00; font-size: 13px; }
+html[data-theme='dark'] .rcal-note { background: #3a2c17; color: #f3c98b; }
+.rcal-sources { display: flex; flex-wrap: wrap; gap: 8px; }
+.rcal-sources button, .rcal-linked button { display: inline-flex; align-items: center; gap: 6px; min-height: 36px; padding: 0 12px; border: 1px solid var(--border); border-radius: 7px; background: var(--surface); color: var(--accent); font-size: 13px; }
+.rcal-sources button:hover, .rcal-linked button:hover { border-color: var(--accent); background: var(--accent-soft); }
+.rcal-linked { padding-top: 12px; border-top: 1px solid var(--border); }
+.rcal-linked p { margin: 8px 0 0; font-size: 14px; color: var(--muted); }
+.rcal-linked strong { color: var(--ink); }
+@media (max-width: 680px) {
+  .rcal-picker { max-width: none; }
+  .rcal-event dl > div { grid-template-columns: minmax(0, 1fr); gap: 2px; }
+}

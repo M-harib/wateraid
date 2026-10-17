@@ -1,6 +1,6 @@
 # GrantGuard frontend
 
-GrantGuard has a Rezzy-inspired landing page and a lean, white-theme React/Vite dashboard for the A6 prototype. It uses the local source pack in `../assets/` and does not generate grant findings on its own.
+GrantGuard has a landing page, a project hub, and a React/Vite evidence workspace for the A6 prototype. Its restrained editorial visual system has light and dark modes. It uses the local source pack in `../assets/` and does not generate grant findings on its own.
 
 ## Run
 
@@ -10,7 +10,7 @@ npm ci
 npm run dev
 ```
 
-Open the local URL printed by Vite. `/` is the landing page; `/dashboard` opens the workspace. `npm run build` runs TypeScript and creates a production bundle. Hosts serving the production bundle must fall back to `index.html` for `/dashboard/*` paths.
+Open the local URL printed by Vite. `/` is the landing page; `/projects` lists projects; `/projects/taps-for-rights` opens the demo case. `/dashboard/*` remains a legacy alias. `npm run build` runs TypeScript and creates a production bundle. Hosts serving the production bundle must fall back to `index.html` for `/projects/*` and `/dashboard/*` paths.
 
 For the connected proposal demo, start the API from the repository root in another terminal:
 
@@ -19,20 +19,26 @@ uv run --env-file .env python -m api.main
 ```
 
 Copy `frontend/.env.example` to `frontend/.env.local` before starting Vite. Open
-`/dashboard/proposal`, choose Q5, Q21, or Q23, or run the full proposal review.
+`/projects/taps-for-rights/proposal`, choose Q5, Q21, or Q23, or run the full proposal review.
 
 ## Current behavior
 
-- The landing page leads into separate Overview, Proposal review, Ask, Issues, Obligations, Calendar, Source library, and Review history views. The PDF viewer occupies the main source canvas; citation cards sit above it.
-- Proposal review calls the dedicated proposal API, displays Q5/Q21/Q23 findings, the nine-row call checklist, and GAC-reviewer mappings, and opens every citation in the existing source library.
+- The project hub lists the Taps for Rights demo and allows separate browser-local projects with a name and optional organization. Every project has its own editable proposal and intake list. New projects do not inherit demo findings or source analysis. Remove a project from its detail page. Account sign-in, cross-device sync, and analysis of new projects are not implemented.
+- The demo project opens in Project documents and also has Proposal draft, Proposal review, Overview, Issues, Obligations, Calendar, Evidence workspace, and Review history views. In the evidence workspace, the PDF occupies the main canvas; the optional Ask the documents panel sits to its right on desktop and opens as a sheet on smaller screens. The document selector stays available when the assistant is open.
+- The desktop left menu can collapse to labeled icon buttons. Its layout choice is remembered in this browser; the mobile drawer keeps full labels.
+- Light mode is the default. The theme switch appears on the landing page, project hub, and dashboard, and saves the choice in this browser. A fine-line wave marks the hero; the workspace uses plain reading surfaces.
+- Project documents accepts PDF, TXT, Markdown, DOCX, and XLSX files by picker or drop zone, stores each original in browser IndexedDB, and extracts text from selectable PDFs, TXT, and Markdown. Files can be downloaded or removed. DOCX and XLSX are stored without extraction, and scanned PDFs need OCR. Uploaded files are **not included in AI analysis** until a project-scoped backend upload route is connected.
+- In the proposal editor, select the supplied preliminary-proposal outline or start blank. The outline has six pages with the requested headings. Click an outline page to scroll to and focus its editor; drag page handles or use the arrows to reorder. Text PDFs, TXT, and Markdown can also be imported into editable pages. Edits save per project in this browser. The demo can load the preliminary proposal from the source pack with one click. A connected demo analysis service can provide cited requirements, issues, and page-specific writing feedback on the right. The user can add individual feedback items or a selected phrase at the saved cursor position, or drag an item onto a page; source notes remain visible. Human approval clears on edits. The browser print dialog prints or saves a selectable-text PDF; this is not OCR.
+- Proposal review calls the dedicated proposal API (`GET /proposal`, `POST /proposal/run`, `POST /proposal/ask`), displays the Q5/Q21/Q23 findings, the call checklist, and GAC-reviewer mappings, and opens every citation in the evidence workspace with the cited excerpt highlighted on the PDF page. The Proposal draft review desk shows the same results (one shared state) and sends page-level writing help to `POST /proposal/ask`.
+- Without dated obligations from the backend, the Reporting calendar shows a month date picker over **sample data** generated from the agreement's reporting schedule (`src/calendarMock.ts`). Every item is tagged "Sample data"; delete that module once `GET /obligations` returns dated items.
 - Without an API URL, the dashboard shows the seven real pack files and three **investigation prompts** from guide questions 8, 11, and 24. It labels them as prompts, never as findings or answers.
-- Click a prompt, issue, or obligation to inspect the cited PDF page in the central source canvas. The viewer supports page navigation and zoom; spreadsheets open as original workbooks.
+- Click a prompt, issue, obligation, or answer citation to inspect the cited PDF page in the central source canvas. The viewer supports page navigation and zoom; spreadsheets open as original workbooks. Original documents are read-only; corrections and decisions are recorded separately on findings.
 - With backend responses, the Issues and Obligations views show validated records. Staff can confirm, correct, dismiss, escalate, or request clarification on findings. Review records are append-only in this browser's `localStorage`, keyed to the finding and its evidence; changes mark earlier reviews stale.
 - This frontend does not verify source quotations itself. The backend must perform quote verification before setting `verified: true`.
 
 ## Backend connection
 
-Copy `.env.example` to `.env.local` and set `VITE_API_BASE_URL` to the FastAPI origin. The frontend requests the build plan's `GET /findings`, `GET /obligations`, and `POST /ask` routes. Proposal review uses `GET /proposal`, `POST /proposal/ask`, and `POST /proposal/run`. Calendar entries are derived from the due dates on cited obligations; `GET /calendar` can replace that projection when its canonical response is ready. Configure CORS for the Vite origin during local development. The frontend currently accepts an array or a `{ "findings": [...] }` wrapper for findings, and an array or `{ "obligations": [...] }` for obligations. A compatible finding view model is:
+Copy `.env.example` to `.env.local` and set `VITE_API_BASE_URL` to the FastAPI origin (default `http://localhost:8010`). Only the Taps for Rights demo calls the build plan's `GET /findings`, `GET /obligations`, and `POST /ask` routes and the proposal routes `GET /proposal`, `POST /proposal/ask`, and `POST /proposal/run` (starts a background review; the dashboard polls `GET /proposal/run/status` and shows step progress). Proposal answers separate the direct answer, evidence confidence, supporting and conflicting evidence, missing information, and a suggested next action. These routes have no project parameter yet, so do not reuse them for new project shells. Calendar entries are derived from the due dates on cited obligations; `GET /calendar` can replace that projection when its canonical response is ready. Configure CORS for the Vite origin during local development. The frontend currently accepts an array or a `{ "findings": [...] }` wrapper for findings, and an array or `{ "obligations": [...] }` for obligations. A compatible finding view model is:
 
 ```json
 {
@@ -76,4 +82,4 @@ For Q&A, the provisional `POST /ask` request is `{ "question": "..." }` and the 
 
 ## Limits
 
-The review log is local to one browser and is not shared with teammates. The PDF view opens the cited page and displays the quoted excerpt above it; it does not yet paint a highlight over the exact words on the page. Q&A needs a connected backend; no answers are preloaded. There is no upload, authentication, or compliance certification in this frontend.
+Project shells and the demo review log are local to one browser and are not shared with teammates. The PDF view opens the cited page and displays the quoted excerpt above it; it does not yet paint a highlight over the exact words on the page. Q&A needs a connected backend; no answers are preloaded. There is no backend upload, OCR, authentication, or compliance certification in this frontend.

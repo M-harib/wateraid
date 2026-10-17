@@ -62,6 +62,30 @@ def test_answer_maps_confirmed_to_answered():
     ans = finding_to_answer(f)
     assert ans["status"] == "answered" and ans["answer"] == "c"
     assert ans["evidence"][0]["documentId"] == "03" and "id" not in ans["evidence"][0]
+    assert ans["confidence"]["level"] == "high"
+    assert ans["supportingEvidence"] == ans["evidence"]
+    assert ans["conflictingEvidence"] == []
+    assert ans["missingInformation"] == []
+    assert ans["suggestedNextAction"]
+
+
+def test_conflict_answer_separates_conflicting_evidence_and_human_action():
+    f = _f(Status.conflict, evidence=[_ev("03", page=3), _ev("04", page=8)],
+           conflict=Conflict("Which deadline applies?", Resolver.gac))
+    ans = finding_to_answer(f)
+    assert ans["confidence"]["level"] == "medium"
+    assert ans["supportingEvidence"] == []
+    assert ans["conflictingEvidence"] == ans["evidence"]
+    assert ans["missingInformation"] == ["Which deadline applies?"]
+    assert "Global Affairs Canada" in ans["suggestedNextAction"]
+
+
+def test_not_found_answer_explains_missing_information_with_low_confidence():
+    f = _f(Status.not_found, searched=["01", "02"])
+    ans = finding_to_answer(f)
+    assert ans["confidence"]["level"] == "low"
+    assert "01, 02" in ans["missingInformation"][0]
+    assert ans["supportingEvidence"] == ans["conflictingEvidence"] == []
 
 
 def test_proposal_checklist_row_maps_nested_evidence_and_absent_sources():

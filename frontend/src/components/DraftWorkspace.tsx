@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowDown, ArrowRight, ArrowUp, Check, FileText, FolderOpen, GripVertical, Plus, Printer, Sparkles, Trash2, Upload } from 'lucide-react'
-import { askProposalQuestion, type AskAnswer } from '../api'
-import { type Finding, type Requirement } from '../domain'
+import { askProposalQuestion, askQuestion, type AskAnswer } from '../api'
+import { type Finding, type ProposalChecklistRow, type ProposalWorkspace, type Requirement } from '../domain'
 import { loadDraft, saveDraft, type Draft } from '../draft'
 import { documentById } from '../documents'
 import { addLocalDocument } from '../localDocuments'
@@ -13,11 +13,18 @@ type Props = {
   findings?: Finding[]
   requirements?: Requirement[]
   analysisConnected?: boolean
+  /** Proposal view owned by the dashboard; null/undefined when the proposal API is unavailable. */
+  proposal?: ProposalWorkspace | null
+  proposalBusy?: boolean
+  proposalError?: string
+  onRunProposal?: () => void
   onOpenIssue?: (finding: Finding) => void
   onOpenRequirement?: (requirement: Requirement) => void
-  onOpenSource?: (documentId: string, page?: number) => void
+  onOpenSource?: (documentId: string, page?: number, excerpt?: string) => void
   onOpenIntake?: () => void
 }
+
+const checklistLabel: Record<ProposalChecklistRow['status'], string> = { met: 'Met', not_met: 'Not met', unclear: 'Unclear', not_addressed: 'Not addressed' }
 
 function splitSuggestions(answer: string): string[] {
   const lines = answer.split(/\n+/).map((line) => line.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, '').trim()).filter(Boolean)
@@ -51,7 +58,7 @@ async function readUpload(file: File): Promise<{ parts: { heading: string; body:
   return { parts: [{ heading: file.name.replace(/\.[^.]+$/, ''), body: text }], kind: 'text' }
 }
 
-export function DraftWorkspace({ projectId, projectName, findings = [], requirements = [], analysisConnected = false, onOpenIssue, onOpenRequirement, onOpenSource, onOpenIntake }: Props) {
+export function DraftWorkspace({ projectId, projectName, findings = [], requirements = [], analysisConnected = false, proposal = null, proposalBusy = false, proposalError = '', onRunProposal, onOpenIssue, onOpenRequirement, onOpenSource, onOpenIntake }: Props) {
   const [draft, setDraft] = useState<Draft>(() => loadDraft(projectId, projectName))
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -69,8 +76,16 @@ export function DraftWorkspace({ projectId, projectName, findings = [], requirem
   const caretRef = useRef<{ id: string; start: number; end: number } | null>(null)
   const activeSection = draft.sections.find((item) => item.id === selectedId) ?? draft.sections[0]
   const suggestionItems = useMemo(() => answer ? splitSuggestions(answer.answer) : [], [answer])
+  // Proposal analysis exists only for the bundled demo case; the dashboard passes it in.
+  const proposalAvailable = analysisConnected && projectId === 'taps-for-rights' && proposal !== null
+  const deskFindings = proposal?.findings.length ? proposal.findings : findings
 
   useEffect(() => { const next = loadDraft(projectId, projectName); setDraft(next); setSelectedId(next.sections[0]?.id ?? ''); setAnswer(null) }, [projectId, projectName])
+
+  function openChecklistRow(row: ProposalChecklistRow) {
+    const first = row.evidence[0]
+    if (first) onOpenSource?.(first.documentId, first.locator.page, first.excerpt)
+  }
 
   function commit(next: Draft, changed = true, keepSuggestion = false) {
     try { setDraft(saveDraft(projectId, { ...next, approvedAt: changed ? null : next.approvedAt })); if (!keepSuggestion) setAnswer(null); setError('') }
@@ -170,7 +185,7 @@ export function DraftWorkspace({ projectId, projectName, findings = [], requirem
     setBusy(true); setError(''); setAnswer(null); setAddedItems([]); setSelectedPhrase('')
     try {
       const prompt = `For the proposal section titled "${activeSection.heading}", ${question.trim()} Use only the supplied project source documents; say when evidence is insufficient. Current draft text: ${activeSection.body.slice(0, 1500)}`
-      const response = await askProposalQuestion(prompt)
+      const response = proposalAvailable ? await askProposalQuestion(prompt) : await askQuestion(prompt)
       setSuggestedForId(activeSection.id)
       setAnswer(response)
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'The analysis service is unavailable.') }
@@ -229,8 +244,14 @@ export function DraftWorkspace({ projectId, projectName, findings = [], requirem
       <aside className="draft-right" aria-label="Analysis and review">
         <div className="draft-panel-title"><strong>Review desk</strong><small>{analysisConnected ? 'Analysis connected' : 'Source review'}</small></div>
         <div className="draft-review-scroll">
-          <div className="draft-review-block"><span className="dashboard-eyebrow">REQUIREMENTS</span>{requirements.length ? requirements.slice(0, 5).map((item) => <button type="button" className="draft-review-item" key={item.id} onClick={() => onOpenRequirement?.(item)}><strong>{item.title}</strong><small>{item.evidence.length} source {item.evidence.length === 1 ? 'reference' : 'references'} <ArrowRight size={12} /></small></button>) : <p>Requirements appear when project source analysis is connected.</p>}</div>
-          <div className="draft-review-block"><span className="dashboard-eyebrow">ISSUES TO REVIEW</span>{findings.length ? findings.slice(0, 5).map((item) => <button type="button" className="draft-review-item" key={item.id} onClick={() => onOpenIssue?.(item)}><strong>{item.title}</strong><small>{item.state.replaceAll('_', ' ')} <ArrowRight size={12} /></small></button>) : <p>No cited issues loaded for this project.</p>}</div>
+          {proposalAvailable && <div className="draft-review-block"><span className="dashboard-eyebrow">PROPOSAL CHECKS</span>
+            {proposal && (proposal.checklist.length > 0 || proposal.findings.length > 0) ? <p>Checked against the 2018 call and the pack. Each result needs human review.</p> : <p>No proposal checks have run since the analysis service started.</p>}
+            <button type="button" className="draft-ask" onClick={() => onRunProposal?.()} disabled={proposalBusy || !onRunProposal}>{proposalBusy ? 'Running checks… (can take a few minutes)' : proposal?.checklist.length ? 'Re-run proposal checks' : 'Run proposal checks'} <ArrowRight size={14} /></button>
+            {proposalError && <small className="draft-desk-error" role="alert">{proposalError}</small>}
+            {proposal?.failures.map((failure) => <small className="draft-desk-error" key={failure}>{failure}</small>)}
+          </div>}
+          <div className="draft-review-block"><span className="dashboard-eyebrow">{proposal?.checklist.length ? 'CALL REQUIREMENTS' : 'REQUIREMENTS'}</span>{proposal?.checklist.length ? proposal.checklist.slice(0, 8).map((row) => <button type="button" className="draft-review-item" key={row.id} disabled={!row.evidence.length} onClick={() => openChecklistRow(row)} title={row.reason}><strong>{row.requirement}</strong><small><span className={`draft-check-status ${row.status}`}>{checklistLabel[row.status]}</span> {row.evidence.length} source {row.evidence.length === 1 ? 'reference' : 'references'} <ArrowRight size={12} /></small></button>) : requirements.length ? requirements.slice(0, 5).map((item) => <button type="button" className="draft-review-item" key={item.id} onClick={() => onOpenRequirement?.(item)}><strong>{item.title}</strong><small>{item.evidence.length} source {item.evidence.length === 1 ? 'reference' : 'references'} <ArrowRight size={12} /></small></button>) : <p>Requirements appear when project source analysis is connected.</p>}</div>
+          <div className="draft-review-block"><span className="dashboard-eyebrow">ISSUES TO REVIEW</span>{deskFindings.length ? deskFindings.slice(0, 5).map((item) => <button type="button" className="draft-review-item" key={item.id} onClick={() => onOpenIssue?.(item)}><strong>{item.title}</strong><small>{item.state.replaceAll('_', ' ')}{item.resolver ? ` · who decides: ${item.resolver === 'gac' ? 'GAC' : 'Water Care staff'}` : ''} <ArrowRight size={12} /></small></button>) : <p>No cited issues loaded for this project.</p>}</div>
           <div className="draft-review-block"><span className="dashboard-eyebrow"><Sparkles size={13} /> AI WRITING HELP</span><p>Ask for cited feedback on the selected page. Choose individual lines to add to your draft.</p><textarea aria-label="Writing help request" value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="How can I make this page clearer?" rows={3} /><button type="button" className="draft-ask" onClick={() => void requestSuggestion()} disabled={!analysisConnected || busy || !question.trim() || !activeSection}>{busy ? 'Checking…' : 'Get feedback'} <ArrowRight size={14} /></button>{!analysisConnected && <small>Connect the analysis service for cited feedback.</small>}
             {answer && <div className="draft-answer"><strong>{answer.status.replaceAll('_', ' ')}</strong><small>{answer.evidence.length} cited source{answer.evidence.length === 1 ? '' : 's'} returned</small>{suggestedForId && <small>For page: {draft.sections.find((section) => section.id === suggestedForId)?.heading ?? 'Removed page'}</small>}
               {suggestionItems.map((item, index) => <div className="draft-answer-item" key={`${index}-${item}`} onMouseUp={(event) => { if ((event.target as HTMLElement).closest('button')) return; const selection = window.getSelection(); setSelectedPhrase(selection?.anchorNode && selection.focusNode && event.currentTarget.contains(selection.anchorNode) && event.currentTarget.contains(selection.focusNode) ? selection.toString().trim() : '') }}><p>{item}</p>{answer.evidence.length > 0 && answer.status !== 'not_found' && <div className="draft-answer-actions"><button type="button" disabled={addedItems.includes(index) || selectedId !== suggestedForId} onClick={() => insertText(item, index)}>{addedItems.includes(index) ? 'Added' : 'Add to doc'}</button><button type="button" className="draft-suggestion-drag" draggable={!addedItems.includes(index)} onDragStart={(event) => event.dataTransfer.setData('application/x-grantguard-suggestion', String(index))} aria-label={`Drag suggestion ${index + 1} to a page`} title="Drag to a page"><GripVertical size={14} /></button></div>}</div>)}

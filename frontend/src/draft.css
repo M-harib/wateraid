@@ -112,3 +112,15 @@
   .draft-left { position: sticky; top: 84px; max-height: calc(100vh - 102px); overflow-y: auto; z-index: 2; }
 }
 @media (max-width: 680px) { .draft-left { position: static; max-height: none; overflow: visible; } }
+
+/* Proposal checklist status chips (status colours from docs/BRAND.md). */
+.draft-check-status { display: inline-block; margin-right: 6px; padding: 1px 7px; border-radius: 999px; font-weight: 600; background: #f1f3f5; color: #4f5763; }
+.draft-check-status.met { background: #e8f5ee; color: #1e6b45; }
+.draft-check-status.not_met { background: #fdecec; color: #9b1c1c; }
+.draft-check-status.unclear { background: #fdf3e1; color: #8a4b00; }
+html[data-theme='dark'] .draft-check-status { background: #22262d; color: #b0b7c2; }
+html[data-theme='dark'] .draft-check-status.met { background: #1d3328; color: #9ad8b5; }
+html[data-theme='dark'] .draft-check-status.not_met { background: #3a1f22; color: #f5b4b4; }
+html[data-theme='dark'] .draft-check-status.unclear { background: #3a2c17; color: #f3c98b; }
+.draft-desk-error { display: block; margin-top: 8px; color: #9b1c1c; }
+html[data-theme='dark'] .draft-desk-error { color: #f5b4b4; }

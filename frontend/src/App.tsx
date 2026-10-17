@@ -7,7 +7,7 @@ import { applyTheme, readTheme } from './theme'
 
 type Route = { kind: 'landing' } | { kind: 'projects'; projectId?: string; projectSection?: 'intake' | 'draft' } | { kind: 'dashboard'; section: DashboardSection }
 
-const sections: DashboardSection[] = ['intake', 'draft', 'overview', 'issues', 'obligations', 'calendar', 'documents', 'reviews']
+const sections: DashboardSection[] = ['intake', 'draft', 'proposal', 'overview', 'issues', 'obligations', 'calendar', 'documents', 'reviews']
 
 function readRoute(): Route {
   const [, root, section, projectSection] = window.location.pathname.split('/')

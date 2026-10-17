@@ -67,11 +67,23 @@ export const ProposalChecklistRowSchema = z.object({
   requirement: z.string().min(1),
   status: z.enum(['met', 'not_met', 'unclear', 'not_addressed']),
   reason: z.string().min(1),
-  evidence: z.array(EvidenceSchema).min(1),
+  // Tolerant on purpose: one malformed row must not reject the whole proposal view.
+  evidence: z.array(EvidenceSchema).default([]),
   searched: z.array(z.string()).default([]),
-  absentSources: z.array(z.string()).default([]),
+  // Model-supplied; may be names or registry records ({ doc_id, title, ... }).
+  absentSources: z.array(z.unknown()).default([]).transform((items) => items.map(absentSourceLabel)),
   computed: z.unknown().nullable().optional(),
 })
+
+function absentSourceLabel(item: unknown): string {
+  if (typeof item === 'string') return item
+  if (item && typeof item === 'object') {
+    const record = item as Record<string, unknown>
+    if (typeof record.title === 'string') return record.title
+    if (typeof record.doc_id === 'string') return record.doc_id
+  }
+  return 'Referenced source not in the pack'
+}
 
 export const ReviewerQuestionSchema = z.object({
   question: EvidenceSchema,

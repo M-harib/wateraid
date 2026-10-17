@@ -6,37 +6,76 @@
 
 ## Last agent
 
-Codex
+Claude (sections below to "What changed (Codex)"); Codex and the proposal workstream before it.
 
 ## Task
 
-Redesign the frontend around the working build plan: a focused landing page, separate dashboard views, and original documents in the main evidence canvas. Branch: `feat/landing-dashboard-workspace`.
+Combine `main` (teammate's backend + proposal review, through `f6b342c`) with the `feat/water-theme` frontend, keeping every water-theme frontend feature. **Not merged:** per the user, no `git merge` and no merge to `main` yet. `feat/water-theme` HEAD is `fae34dd` (no merge commit); the combined work is staged in the working tree. A full backup patch is in the Claude session scratchpad (`combined-water-theme-main.patch`, 347 KB).
 
-## What changed
+## What changed (Claude)
 
-- Replaced the all-in-one dashboard with a Rezzy-inspired landing page at `/` and a white workspace at `/dashboard`.
-- Split the workspace into Overview, Ask, Issues, Obligations, Reporting calendar, Source library, and Review history. The PDF is now the central canvas in Source library, with citation cards above it and a compact file list to the left.
-- Kept source-pack preview honest: seven original files and guide questions 8, 11, and 24 are available, but no generated answers or findings are seeded.
-- Added a provisional `POST /ask` adapter. `GET /findings` and `GET /obligations` still feed the Issues and Obligations views; Calendar is projected from cited obligation dates until the canonical calendar route exists. All responses are validated before display.
-- Preserved browser-local human review, including a stale indicator when a finding or its evidence changes. Removed the unused right-panel evidence component.
-- Updated `AGENTS.md`, architecture, decisions, and frontend README to treat `docs/Taps_for_Rights_Build_Plan.pdf` as the working plan. The original source pack remains authoritative for grant facts.
+- **Backend from `main`, unchanged:** `api/`, `core/`, `tools/`, `tests/`, `pyproject.toml`, `uv.lock`, `Makefile`, `.env.example`, `.python-version`, updated `docs/WORKSTREAMS.md`.
+- **Teammate's frontend ported into the water-theme UI** (not the other way round):
+  - "Proposal review" nav section (Q5/Q21/Q23 prompts, run card, question composer, priority findings, call checklist, GAC reviewer mapping). CSS rewritten with theme tokens and BRAND.md status colours; dark-mode values; mobile breakpoint fixed (their unconditional 3-column rule overrode mobile).
+  - Their Ask link pointed to the removed `ask` page; it now opens the evidence-workspace assistant.
+  - `PdfPreview` excerpt highlighting (from `main`) is now wired to findings, requirements, checklist evidence, reviewer rows, answer citations and evidence cards.
+- **One proposal state:** `Dashboard` owns the proposal workspace and passes it to the Proposal draft review desk (no second fetch/run). Proposal findings now open with their context panel and "Record human review".
+- **One proposal API client** in `api.ts`: `loadProposalWorkspace`, `runProposalChecks` (360 s), `askProposalQuestion` (150 s), surfacing backend `detail` messages. My earlier duplicate client was removed.
+- **Schema tolerance** (`domain.ts`): checklist `evidence` defaults to `[]` and `absentSources` accepts strings or registry objects, so one odd row cannot reject the whole proposal view.
+- **Fixes found in rehearsal:** duplicate React keys on evidence cards (backend evidence ids are `doc:page`, not unique); evidence cards now pass the excerpt for highlighting; resolver shown as "Who decides: GAC / Water Care staff" instead of raw `gac`.
+- README and this file combine both sides; README routes corrected to `/projects/taps-for-rights/proposal`.
 
-## Verification
+## Verification (Claude)
 
-- `npm run build` passed (TypeScript and Vite). Vite still warns that the on-demand PDF chunk exceeds 500 kB.
-- Headless Chrome checked landing → workspace → source library → Q&A on desktop, and landing → workspace and the source canvas on a 390 px viewport. The PDF rendered in the center; mobile zoom increased its width within a horizontally scrollable viewer without page overflow or page errors.
-- A browser smoke test with temporary mocked `GET /findings`, `GET /obligations`, and `POST /ask` verified a two-source finding with a new kind and resolver, PDF navigation, a clarification review saved to history, and an answer citation opening the source canvas. These fixtures live outside product code.
-- Final `npm run build` and `git diff --check` passed.
+- No water-theme frontend file deleted vs `fae34dd`; every removed line is an in-place edit.
+- `pytest -q` on the combined tree (Python 3.14 venv, pinned deps): **160 passed**.
+- `npx tsc --noEmit` and `npm run build`: pass.
+- Live backend with the `.env` key: `POST /proposal/ask` (Q5) returned a cited conflict (01 p.5 vs 03 p.2), quotes verified against page text. `POST /proposal/run` ×3: 66 s / 75 s / 31 s; 67/68 quotes matched page text (the miss is word-exact but joins two logic-model table rows with ";"). A cited writing suggestion for the cost-share page returned "answered" with a verified 02 p.1 quote.
+- Playwright (Chrome) on a connected dev server: proposal review 16 checklist rows, findings, 9 reviewer rows, nav badge; cited issue opens with context, review button and 3 PDF highlights; draft from case proposal (6 pages) → cited feedback → Add to doc (source notes) → Approve; calendar; dark mode; 0 px mobile overflow on proposal, draft, overview; no console errors after the key fix.
+
+## Merge into main (Claude)
+
+- Merged `origin/main` (PR #5, an earlier water-theme + main integration; its resolution is a subset of ours, so ours kept plus its Ask-panel excerpt highlighting and highlight clearing on document switch) and `origin/feat/proposal` `10c80f8` (structured answers + background review progress).
+- `10c80f8` changed the API contract: `POST /proposal/run` now returns 202 + run status; the frontend polls `GET /proposal/run/status`. Ported into the water-theme UI: progress bar with steps on the Proposal review card (also drives the draft desk's run button), structured `AnswerPanel` (direct answer, evidence confidence, supporting/conflicting evidence, missing information, next action). New CSS uses theme tokens.
+- Verified: `pytest -q` 165 passed; `tsc` and `npm run build` pass; live run returned 202 and progressed to completed; Q5 answer shows medium confidence and conflicting evidence; Playwright: progress steps render, answer citation opens the PDF with highlights, 0 px mobile overflow, no console errors.
+- New backend issue: `startup()` now runs all five steps concurrently; the checklist step then failed in 2 of 2 runs ("Response must be a finite JSON object"), versus 1 of 3 when sequential.
+
+## Open issues (Claude)
+
+- **Backend, for the proposal owner:** "Cost Share Vs Call" failed in all 3 full runs (`tools/proposal/evidence.py` `cited_percentage` rejects quotes with zero or several percentages); the checklist failed once with "Response must be a finite JSON object"; checklist row count varies (14 vs 16). Every `/proposal/ask` is stored as a proposal finding, so writing-help requests appear as "Generic Qa" priority findings.
+- PDF highlight matching is loose (any text item of 5+ characters contained in the quote), so short phrases elsewhere can light up.
+- `make up` uses `setsid`, which macOS lacks; the team README assumes `uv`. Without uv: `python3 -m venv .venv`, install the pinned deps, `.venv/bin/python -m uvicorn api.main:app --port 8010`.
+- Ports 5173/5174 are taken by existing local Vite servers without `VITE_API_BASE_URL`; the backend's default CORS only allows 5173/5174 (`GG_CORS_ORIGINS` overrides).
+- Calendar sample data (`calendarMock.ts`) still to be replaced by `GET /obligations` dates.
+
+## What changed (Codex)
+
+- Replaced the pastel/wave-card look with white and charcoal surfaces, a small blue accent, and a fine vector wave inspired by `design/dynamic-wave.avif`. Landing copy now leads with “Monitor your compliance with confidence.” Light/dark choice remains.
+- Added `Project documents` as the demo project's opening view. New local projects open an independent intake. PDF, TXT, MD, DOCX, and XLSX originals are stored per project in browser IndexedDB; text is extracted from selectable PDF, TXT, and MD. Users can download/remove originals and move extracted text into the draft. DOCX/XLSX and scanned PDFs need an extraction/OCR service before they can become editable text.
+- Added a six-page preliminary proposal template with the headings from the supplied proposal. The page outline scrolls to and focuses a page editor, and page handles/arrows reorder pages. The demo still supports one-click import of the supplied preliminary proposal PDF. Drafts autosave in this browser.
+- The right review desk shows backend-provided requirements and issues when available. It calls the existing `POST /ask` endpoint for source-grounded writing feedback in the demo case. Cited feedback is split into individual items with `Add to doc` buttons, a selected-phrase action, and a drag handle. Insertions use the saved cursor/selection and retain source notes. New local projects have no demo analysis leakage.
+- Added human draft approval, automatically cleared on subsequent edits. Print / save PDF uses the browser print dialog and exports selectable text. Scanned PDF OCR is not implemented; import reports the limitation.
+- Existing Issues, Obligations, Evidence workspace, and finding review flows remain available in the sidebar.
+
+## Verification (Codex)
+
+- `npm run build` passed after the editor integration; TypeScript passed. PDF import loads dynamically, keeping the initial app chunk below Vite's 500 kB warning threshold.
+- Headless Chrome checked the landing light/dark toggle, persistence, project navigation, and mobile overflow. The earlier editor smoke check passed for routing, editing, approval/reset, TXT intake, section reorder, and print-to-PDF generation. A new intake/template smoke check passed for new-project routing, TXT upload persistence, moving text into a draft, six template pages, page focus, reorder, and mobile overflow; no page errors.
+- Headless Chrome imported the supplied proposal PDF into six editable page sections and confirmed extracted text on the first page.
+- A separate project test passed setup, project-specific intake, persistence, and isolation from the demo's unscoped analysis API.
+- A mocked connected API test passed requirements and issues in the review desk, a cited suggestion, insertion with a saved source note, and navigation to the original cited document. The real backend was not connected in this check.
+- Chromium generated a three-page PDF from the edited draft; PDF.js read the exported text successfully.
+- `git diff --check` passed after the final docs update.
 
 ## Integration notes and limits
 
-The build plan names `core/schema.py` as the canonical backend/frontend contract; `docs/WORKSTREAMS.md` places it at `backend/core/schema.py` and assigns W1 ownership. The frontend's Zod types and Q&A response are provisional. The dashboard now accepts new `Finding.kind` strings and displays an optional `resolver`, resolving two of the frontend contract points in `docs/WORKSTREAMS.md`. Map the canonical FastAPI output into these view models or generate types from OpenAPI; do not force the backend to match a temporary frontend shape. No backend is connected in the default preview. Q&A requires `POST /ask`; source quote verification belongs to the backend. The review log is local to one browser. PDF citations open a page and display an excerpt above it; exact in-page highlighting remains pending.
+`frontend/src/api.ts` still uses the provisional `GET /findings`, `GET /obligations`, and `POST /ask` contract for the Taps for Rights demo only. W1 owns `backend/core/schema.py`; coordinate any API change. The writing-help prompt passes draft context to `/ask`, but that endpoint was designed for Q&A, so review actual backend behavior before making it a judged demo step. No project-scoped upload or analysis API exists yet. The backend needs a project-scoped document upload/ingestion route, document IDs and processing status, and project-scoped findings/obligations before these uploads can participate in AI analysis. Browser-local originals/drafts are suitable for a live single-browser demo and are not shared across devices. PDF text extraction preserves text, not original layout; scanned PDFs require an OCR service.
 
-The teammate-provided build-plan PDF, `docs/WORKSTREAMS.md`, and the concurrent edit to `docs/CURRENT_TASK.md` were published in a separate documentation commit without changing their content. The reference screenshots `design/design-3.png` and `design/design-4.png` remain untracked and are not required by the app.
+The untracked `design/design-3.png`, `design/design-4.png`, and `design/dynamic-wave.avif` are user references. They were not modified or added to the app bundle. The uncommitted theme files are part of this branch and should be preserved.
 
-## Review findings
+## Suggested next step
 
-None recorded yet.
+Connect a project-scoped upload/analysis flow with the backend team, then inspect one cited finding and one writing suggestion in the right desk. Rehearse: project → upload documents → choose template → edit/reorder → inspect issue → insert suggestion → approve → print/save PDF. Keep source claims tied to the original pack and do not seed fabricated findings.
 
 ---
 
@@ -211,3 +250,32 @@ Verification:
 
 A fresh live-model answer-quality run still requires restoring the exhausted OpenRouter
 account balance.
+
+### Structured answers and asynchronous proposal review - 2026-10-17
+
+Expanded the API answer view without changing `core/schema.py`. Both document and proposal
+answers now expose a direct answer, evidence-confidence level and reason, separate supporting
+and conflicting evidence, missing information, and a suggested next action. The dashboard
+renders the recommendation in its own labelled block so it cannot be mistaken for a document
+fact. Existing `answer`, `status`, and `evidence` fields remain for compatibility.
+
+Changed the full proposal review into a tracked background job. `POST /proposal/run` returns
+HTTP 202 immediately, and `GET /proposal/run/status` reports five step states plus completed
+count and percentage. The three focused checks, checklist, and reviewer mapping run
+concurrently within the shared model semaphore. Duplicate start requests reuse the active
+run, the dashboard polls every 800 ms, partial stored views remain readable, and lifespan
+shutdown cancels an unfinished task cleanly.
+
+Verification:
+
+- `uv run pytest -q` - 165 passed with two upstream deprecation warnings.
+- `npm run build` - TypeScript and Vite passed; the existing PDF chunk-size warning remains.
+- A live background start returned in 114 ms and visibly advanced 0%, 20%, 40%, 60%, 80%,
+  then 100% over about 71 seconds. The dashboard stayed usable during the run.
+- The live run returned nine reviewer mappings and surfaced two invalid model extractions as
+  named retryable failures; it did not silently accept them.
+- A live open-ended partner question returned an accurate direct answer with high evidence
+  confidence and two verified proposal citations, with conflicts, gaps, and the recommendation
+  serialized separately.
+- A 1440 px Edge headless render verified the in-progress step list, progress bar, partial
+  findings, composer, and responsive card layout.
