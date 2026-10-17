@@ -12,6 +12,7 @@ dependencies = [
     "pydantic==2.13.5",
     "starlette==1.6.0",
     "python-dotenv==1.2.4",
+    "python-multipart==0.0.32",
 ]
 
 [tool.uv]

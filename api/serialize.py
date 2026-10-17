@@ -125,9 +125,11 @@ def issues_payload(findings: list[Finding]) -> list[dict]:
     return out
 
 
-def finding_to_answer(f: Finding) -> dict:
-    """Finding -> AnswerSchema; forces evidence/status to satisfy the FE contract."""
-    usable = [e for e in f.evidence if e.ref.doc_id in PACK_DOCS and _valid_locator(e.ref)]
+def finding_to_answer(f: Finding, allowed_docs: set | None = PACK_DOCS) -> dict:
+    """Finding -> AnswerSchema; forces evidence/status to satisfy the FE contract.
+    allowed_docs=None accepts any doc id (uploaded-project corpora)."""
+    usable = [e for e in f.evidence
+              if (allowed_docs is None or e.ref.doc_id in allowed_docs) and _valid_locator(e.ref)]
     evidence = [evidence_light(e) for e in usable]
     status = "answered" if f.status == Status.confirmed else f.status.value
     if status == "answered" and not evidence:
