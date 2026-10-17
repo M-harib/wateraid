@@ -4,7 +4,7 @@ import { LandingPage } from './LandingPage'
 
 type Route = { kind: 'landing' } | { kind: 'dashboard'; section: DashboardSection }
 
-const sections: DashboardSection[] = ['overview', 'ask', 'issues', 'obligations', 'calendar', 'documents', 'reviews']
+const sections: DashboardSection[] = ['overview', 'proposal', 'ask', 'issues', 'obligations', 'calendar', 'documents', 'reviews']
 
 function readRoute(): Route {
   const [, root, section] = window.location.pathname.split('/')

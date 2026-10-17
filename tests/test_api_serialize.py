@@ -2,7 +2,14 @@
 from __future__ import annotations
 
 from core import Conflict, Evidence, Finding, Resolver, SourceRef, Status
-from api.serialize import evidence_full, finding_to_answer, finding_to_issue, issues_payload
+from api.serialize import (
+    checklist_rows_to_view,
+    evidence_full,
+    finding_to_answer,
+    finding_to_issue,
+    issues_payload,
+    reviewer_rows_to_view,
+)
 
 
 def _ev(doc, page=None, sheet=None, cells=None, quote="q", verified=True):
@@ -55,3 +62,26 @@ def test_answer_maps_confirmed_to_answered():
     ans = finding_to_answer(f)
     assert ans["status"] == "answered" and ans["answer"] == "c"
     assert ans["evidence"][0]["documentId"] == "03" and "id" not in ans["evidence"][0]
+
+
+def test_proposal_checklist_row_maps_nested_evidence_and_absent_sources():
+    evidence = {"ref": {"doc_id": "01", "version": "synthetic", "page": 2},
+                "quote": "Applicants must be eligible.", "verified": True}
+    rows = checklist_rows_to_view([{
+        "id": "row-1", "category": "eligibility", "requirement": "Eligible applicant",
+        "status": "unclear", "reason": "Review required.", "evidence": [evidence],
+        "searched": ["02:p1"], "absent_sources": ["LOCAL_PARTNERS"], "computed": None,
+    }])
+    assert rows[0]["evidence"][0]["documentId"] == "01"
+    assert rows[0]["absentSources"] == ["LOCAL_PARTNERS"]
+
+
+def test_reviewer_mapping_uses_full_evidence_shape():
+    question = {"ref": {"doc_id": "06", "version": None, "sheet": "Review", "cells": "A2"},
+                "quote": "How will delivery work?", "verified": True}
+    proposal = {"ref": {"doc_id": "02", "version": None, "page": 1},
+                "quote": "Delivery is described here.", "verified": True}
+    rows = reviewer_rows_to_view([{"question": question, "proposal": [proposal],
+                                   "status": "mapped", "reason": "Section C addresses it."}])
+    assert rows[0]["question"]["locator"] == {"sheet": "Review", "cells": "A2"}
+    assert rows[0]["proposal"][0]["documentId"] == "02"

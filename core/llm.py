@@ -16,14 +16,22 @@ class LLM(Protocol):
 
 class OpenRouterLLM:
     def __init__(self, api_key: str | None = None, models: dict | None = None,
-                 base_url: str = "https://openrouter.ai/api/v1/chat/completions") -> None:
+                 base_url: str = "https://openrouter.ai/api/v1/chat/completions",
+                 max_tokens: int | None = None) -> None:
         self.api_key = api_key if api_key is not None else os.getenv("OPENROUTER_API_KEY")
         self.models = models or {  # read at construction so .env (loaded at startup) applies
             "mini": os.getenv("LLM_MINI", "openai/gpt-4.1-mini"),
             "strong": os.getenv("LLM_STRONG", "openai/gpt-4.1"),
         }
-        self.max_tokens = int(os.getenv("LLM_MAX_TOKENS", "2000"))  # a Finding is small; avoids over-reserving credits
         self.base_url = base_url
+        configured = ({
+            "mini": int(os.getenv("LLM_MINI_MAX_TOKENS", "4096")),
+            "strong": int(os.getenv("LLM_STRONG_MAX_TOKENS", "1024")),
+        } if max_tokens is None else {tier: max_tokens for tier in self.models})
+        if any(isinstance(value, bool) or not isinstance(value, int) or value <= 0
+               for value in configured.values()):
+            raise ValueError("max_tokens must be a positive integer")
+        self.max_tokens = configured
 
     async def complete(self, *, tier: str, system: str, user: str, json_mode: bool = False) -> str:
         # ponytail: urllib in a thread; httpx.AsyncClient if call concurrency outgrows the pool.
@@ -34,9 +42,9 @@ class OpenRouterLLM:
             raise RuntimeError("OPENROUTER_API_KEY not set")
         payload: dict = {
             "model": self.models[tier],
+            "max_tokens": self.max_tokens[tier],
             "messages": [{"role": "system", "content": system},
                          {"role": "user", "content": user}],
-            "max_tokens": self.max_tokens,
         }
         if json_mode:
             payload["response_format"] = {"type": "json_object"}

@@ -61,10 +61,39 @@ export const DashboardSchema = z.object({
   requirements: z.array(RequirementSchema).default([]),
 })
 
+export const ProposalChecklistRowSchema = z.object({
+  id: z.string().min(1),
+  category: z.string().min(1),
+  requirement: z.string().min(1),
+  status: z.enum(['met', 'not_met', 'unclear', 'not_addressed']),
+  reason: z.string().min(1),
+  evidence: z.array(EvidenceSchema).min(1),
+  searched: z.array(z.string()).default([]),
+  absentSources: z.array(z.string()).default([]),
+  computed: z.unknown().nullable().optional(),
+})
+
+export const ReviewerQuestionSchema = z.object({
+  question: EvidenceSchema,
+  proposal: z.array(EvidenceSchema),
+  status: z.enum(['mapped', 'not_addressed']),
+  reason: z.string().min(1),
+})
+
+export const ProposalWorkspaceSchema = z.object({
+  findings: z.array(FindingSchema),
+  checklist: z.array(ProposalChecklistRowSchema),
+  reviewerQuestions: z.array(ReviewerQuestionSchema),
+  failures: z.array(z.string()),
+})
+
 export type Evidence = z.infer<typeof EvidenceSchema>
 export type Finding = z.infer<typeof FindingSchema>
 export type Requirement = z.infer<typeof RequirementSchema>
 export type DashboardData = z.infer<typeof DashboardSchema>
+export type ProposalChecklistRow = z.infer<typeof ProposalChecklistRowSchema>
+export type ProposalWorkspace = z.infer<typeof ProposalWorkspaceSchema>
+export type ReviewerQuestion = z.infer<typeof ReviewerQuestionSchema>
 
 export function evidenceLocation(evidence: Evidence): string {
   const parts: string[] = []

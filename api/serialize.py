@@ -2,9 +2,12 @@
 (frontend/src/domain.ts + api.ts). The one place the two contracts meet."""
 from __future__ import annotations
 
-from core import Finding, Status, locator_label
+from datetime import date
+
+from core import Finding, Status
 from core.checks import score_urgency
-from tools.compliance.config import AS_OF
+
+AS_OF = date(2022, 6, 30)
 
 PACK_DOCS = {"00", "01", "02", "03", "04", "05", "06"}  # frontend documentId enum
 
@@ -45,6 +48,28 @@ def evidence_light(ev) -> dict:
     if ev.quote:
         d["excerpt"] = ev.quote
     return d
+
+
+def evidence_dict_full(ev: dict) -> dict:
+    """Serialized core Evidence -> frontend EvidenceSchema."""
+    ref = ev["ref"]
+    locator = {key: ref[key] for key in ("page", "section", "sheet", "cells") if ref.get(key) is not None}
+    if ref.get("page") is not None:
+        evidence_id = f'{ref["doc_id"]}:p{ref["page"]}'
+    elif ref.get("sheet") and ref.get("cells"):
+        evidence_id = f'{ref["doc_id"]}:{ref["sheet"]}!{ref["cells"]}'
+    else:
+        evidence_id = f'{ref["doc_id"]}:{ref.get("section") or "ref"}'
+    result = {
+        "id": evidence_id,
+        "documentId": ref["doc_id"],
+        "version": ref.get("version"),
+        "locator": locator,
+        "verified": bool(ev.get("verified")),
+    }
+    if ev.get("quote"):
+        result["excerpt"] = ev["quote"]
+    return result
 
 
 def _priority(f: Finding) -> str:
@@ -101,4 +126,53 @@ def finding_to_answer(f: Finding) -> dict:
         "answer": f.claim or "No answer could be supported from the provided documents.",
         "status": status,
         "evidence": [evidence_light(e) for e in f.evidence if e.ref.doc_id in PACK_DOCS],
+    }
+
+
+def checklist_rows_to_view(rows: list[dict]) -> list[dict]:
+    """Proposal checklist rows -> camelCase browser view models."""
+    return [{
+        "id": row["id"],
+        "category": row["category"],
+        "requirement": row["requirement"],
+        "status": row["status"],
+        "reason": row["reason"],
+        "evidence": [evidence_dict_full(ev) for ev in row.get("evidence", [])
+                     if ev.get("ref", {}).get("doc_id") in PACK_DOCS],
+        "searched": row.get("searched", []),
+        "absentSources": row.get("absent_sources", []),
+        "computed": row.get("computed"),
+    } for row in rows]
+
+
+def reviewer_rows_to_view(rows: list[dict]) -> list[dict]:
+    """GAC-reviewer mappings -> camelCase browser view models."""
+    return [{
+        "question": evidence_dict_full(row["question"]),
+        "proposal": [evidence_dict_full(ev) for ev in row.get("proposal", [])],
+        "status": row["status"],
+        "reason": row["reason"],
+    } for row in rows]
+
+
+def proposal_payload(findings: list[Finding]) -> dict:
+    """Read the proposal views back out of the shared finding store."""
+    proposal = [finding for finding in findings if finding.tool == "proposal"]
+    checklist_rows: list[dict] = []
+    reviewer_rows: list[dict] = []
+    failures: list[str] = []
+    for finding in proposal:
+        result = finding.computed.result if finding.computed else {}
+        if result.get("error"):
+            label = finding.topic.replace("_", " ").title()
+            failures.append(f"{label}: {finding.claim}")
+        elif finding.topic == "checklist":
+            checklist_rows = result.get("rows", [])
+        elif finding.topic == "reviewer_mapping":
+            reviewer_rows = result.get("rows", [])
+    return {
+        "findings": issues_payload(proposal),
+        "checklist": checklist_rows_to_view(checklist_rows),
+        "reviewerQuestions": reviewer_rows_to_view(reviewer_rows),
+        "failures": failures,
     }
