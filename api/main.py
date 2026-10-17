@@ -20,7 +20,9 @@ from .serialize import finding_to_answer, issues_payload
 
 
 def _origins() -> list[str]:
-    raw = os.getenv("GG_CORS_ORIGINS", "http://localhost:5173")
+    # Vite binds 127.0.0.1 (see frontend/vite.config); allow both host spellings.
+    default = "http://localhost:5173,http://127.0.0.1:5173"
+    raw = os.getenv("GG_CORS_ORIGINS", default)
     return [o.strip() for o in raw.split(",") if o.strip()]
 
 
