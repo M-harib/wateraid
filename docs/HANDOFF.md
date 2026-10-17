@@ -129,3 +129,9 @@ Commands actually run:
 The built-in browser provider was unavailable, so the visual check used the installed
 Edge headless executable. Live checklist reliability still depends on the model returning
 every mandatory call quote verbatim; invalid quotations fail closed and appear in `failures`.
+
+Follow-up after manual Q5 testing: OpenRouter returned HTTP 402. Proposal model failures
+now preserve a safe cause (`provider_rejected` or `provider_rate_limited`), and
+`POST /proposal/ask` returns HTTP 503 instead of wrapping the failure in a misleading
+HTTP 200 `needs_review` answer. `uv run pytest -q tests/test_api.py tests/test_proposal.py`
+passed 57 tests; a live Q5 request returned 503 with the credentials/credits guidance.

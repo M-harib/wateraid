@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import json
+from urllib.error import HTTPError
 
 from fastapi.testclient import TestClient
 
@@ -23,6 +24,11 @@ CONFIRMED = json.dumps({
 
 def _client(canned: str) -> TestClient:
     return TestClient(create_app(core=Core("assets"), llm=FakeLLM(canned)))
+
+
+class RejectingLLM:
+    async def complete(self, **kwargs):
+        raise HTTPError("https://provider.invalid", 402, "payment required", {}, None)
 
 
 def test_healthz():
@@ -82,3 +88,10 @@ def test_proposal_ask_abstains_for_known_absent_form():
 def test_proposal_ask_requires_question():
     with _client(CONFIRMED) as c:
         assert c.post("/proposal/ask", json={"question": " "}).status_code == 400
+
+
+def test_proposal_provider_rejection_is_http_failure():
+    with TestClient(create_app(core=Core("assets"), llm=RejectingLLM())) as c:
+        response = c.post("/proposal/ask", json={"question": "Does the cost share meet the call?"})
+        assert response.status_code == 503
+        assert "credentials or credits" in response.json()["detail"]

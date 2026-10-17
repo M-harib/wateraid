@@ -100,6 +100,8 @@ def create_app(*, core: Core | None = None, llm=None) -> FastAPI:
         if not question:
             return JSONResponse({"detail": "question is required"}, status_code=400)
         finding = await request.app.state.proposal.finding(question)
+        if finding.computed and finding.computed.result.get("error"):
+            return JSONResponse({"detail": finding.claim}, status_code=503)
         return finding_to_answer(finding)
 
     @app.post("/proposal/run")

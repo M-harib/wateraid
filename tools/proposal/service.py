@@ -4,6 +4,7 @@ from __future__ import annotations
 import asyncio
 import json
 from dataclasses import asdict
+from urllib.error import HTTPError
 
 from core import Core, Computed, Conflict, Finding, LLM, Resolver, Status, Unit, run, to_dict
 from core.checks import check_cost_share, score_urgency
@@ -94,6 +95,7 @@ class ProposalAssistant:
 
             async def draft(at_tier: str, repair: str | None) -> Finding:
                 nonlocal reviewed_draft
+                error_code = "analysis_incomplete"
                 # The shared gate treats every needs_review as a repair request. A validated
                 # qualitative judgment is intentionally for people; don't replace it with a
                 # less complete second model answer just to turn it into 'confirmed'.
@@ -113,12 +115,23 @@ class ProposalAssistant:
                     return finding
                 except (InvalidOutput, ValueError, TypeError, KeyError) as exc:
                     diagnostics.append(f"Invalid extraction: {exc}")
+                except HTTPError as exc:
+                    if exc.code in {401, 402, 403}:
+                        diagnostics.append(
+                            "Analysis provider rejected the request. Check server-side model credentials or credits."
+                        )
+                        error_code = "provider_rejected"
+                    elif exc.code == 429:
+                        diagnostics.append("Analysis provider is temporarily rate limited. Try again shortly.")
+                        error_code = "provider_rate_limited"
+                    else:
+                        diagnostics.append("Analysis service unavailable or timed out.")
                 except (OSError, RuntimeError, TimeoutError):
                     # Do not return transport bodies, credentials or provider details to the UI.
                     diagnostics.append("Analysis service unavailable or timed out.")
                 return self._finding(key, topic, diagnostics[-1], Status.needs_review,
                     searched=sorted({u.doc_id for u in units}),
-                    computed=Computed({}, {"error": "analysis_incomplete"}))
+                    computed=Computed({}, {"error": error_code}))
 
             result = await run(tier, draft, max_escalations=0 if tier == "strong" else 1)
             await self.core.findings.add(result.finding)
