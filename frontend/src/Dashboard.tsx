@@ -4,18 +4,24 @@ import { askQuestion, loadDashboard, type AskAnswer, type DashboardConnection } 
 import { BrandMark } from './Brand'
 import { ReviewDialog } from './components/ReviewDialog'
 import { AskPanel } from './components/AskPanel'
+import { ThemeToggle } from './components/ThemeToggle'
+import { DraftWorkspace } from './components/DraftWorkspace'
+import { ProjectDocuments } from './components/ProjectDocuments'
 import { documentById, documents } from './documents'
 import { evidenceLocation, type Finding, type Requirement } from './domain'
 import { investigations, type Investigation } from './investigations'
 import { appendReview, evidenceFingerprint, latestReviewFor, loadReviews, type ReviewDecision, type ReviewRecord } from './reviews'
+import type { Theme } from './theme'
 
 const PdfPreview = lazy(() => import('./components/PdfPreview').then((module) => ({ default: module.PdfPreview })))
 
-export type DashboardSection = 'overview' | 'issues' | 'obligations' | 'calendar' | 'documents' | 'reviews'
+export type DashboardSection = 'intake' | 'draft' | 'overview' | 'issues' | 'obligations' | 'calendar' | 'documents' | 'reviews'
 type Focus = { kind: 'finding'; id: string } | { kind: 'requirement'; id: string } | { kind: 'investigation'; id: string } | null
-type Props = { section: DashboardSection; onNavigate: (section: DashboardSection) => void; onExit: () => void; onProjects: () => void }
+type Props = { section: DashboardSection; onNavigate: (section: DashboardSection) => void; onExit: () => void; onProjects: () => void; theme: Theme; onToggleTheme: () => void }
 
 const nav: { section: DashboardSection; title: string; icon: typeof LayoutDashboard }[] = [
+  { section: 'intake', title: 'Project documents', icon: FolderOpen },
+  { section: 'draft', title: 'Proposal draft', icon: FileText },
   { section: 'overview', title: 'Overview', icon: LayoutDashboard },
   { section: 'issues', title: 'Issues', icon: CircleAlert },
   { section: 'obligations', title: 'Obligations', icon: BookOpenText },
@@ -46,7 +52,7 @@ function EmptyState({ icon: Icon, title, description, action }: { icon: typeof F
   return <div className="clean-empty"><span className="clean-empty-icon"><Icon size={25} /></span><h2>{title}</h2><p>{description}</p>{action}</div>
 }
 
-export function Dashboard({ section, onNavigate, onExit, onProjects }: Props) {
+export function Dashboard({ section, onNavigate, onExit, onProjects, theme, onToggleTheme }: Props) {
   const [connection, setConnection] = useState<DashboardConnection>({ mode: 'preview', data: { projectName: 'Taps for Rights', asOf: '2022-06-30', findings: [], requirements: [] } })
   const [reviews, setReviews] = useState<ReviewRecord[]>(loadReviews)
   const [focus, setFocus] = useState<Focus>(null)
@@ -168,9 +174,11 @@ export function Dashboard({ section, onNavigate, onExit, onProjects }: Props) {
     </aside>
 
     <div className="dashboard-body">
-      <header className="dashboard-topbar"><button className="dashboard-mobile-menu" type="button" onClick={() => setMobileNav(true)} aria-label="Open navigation"><Menu size={21} /></button><span className="dashboard-crumb">Workspace <ChevronRight size={15} /> <strong>{nav.find((item) => item.section === section)?.title}</strong></span><span className={`service-state ${connection.mode === 'connected' ? 'connected' : ''}`}><i /> {connection.mode === 'connected' ? 'Analysis connected' : connection.mode === 'unavailable' ? 'Service unavailable' : 'Source pack preview'}</span></header>
+      <header className="dashboard-topbar"><button className="dashboard-mobile-menu" type="button" onClick={() => setMobileNav(true)} aria-label="Open navigation"><Menu size={21} /></button><span className="dashboard-crumb">Workspace <ChevronRight size={15} /> <strong>{nav.find((item) => item.section === section)?.title}</strong></span><div className="dashboard-topbar-actions"><span className={`service-state ${connection.mode === 'connected' ? 'connected' : ''}`}><i /> {connection.mode === 'connected' ? 'Analysis connected' : connection.mode === 'unavailable' ? 'Service unavailable' : 'Source pack preview'}</span><ThemeToggle theme={theme} onToggle={onToggleTheme} /></div></header>
 
       <main className={`dashboard-main dashboard-${section}`}>
+        {section === 'intake' && <ProjectDocuments projectId="taps-for-rights" projectName="Taps for Rights" onGoDraft={() => navigate('draft')} onOpenBundled={(id) => openSource(id)} />}
+        {section === 'draft' && <DraftWorkspace projectId="taps-for-rights" projectName="Taps for Rights" findings={findings} requirements={requirements} analysisConnected={connection.mode === 'connected'} onOpenIssue={openFinding} onOpenRequirement={openRequirement} onOpenSource={openCitation} onOpenIntake={() => navigate('intake')} />}
         {section === 'overview' && <>
           <SectionHeading eyebrow="CASE OVERVIEW / 30 JUNE 2022" title="What needs attention?" subtitle="One place to ask, inspect, and decide—grounded in the original grant documents." />
           <div className="overview-feature"><div><span className="overview-feature-kicker"><MessageSquareText size={16} /> START HERE</span><h2>Ask while you<br />read the source.</h2><p>Trace the answer to its source, or see where the evidence is missing.</p><button className="solid-button" type="button" onClick={openAssistant}>Open evidence workspace <ArrowRight size={17} /></button></div><div className="overview-feature-art" aria-hidden="true"><div><span>QUESTION</span><strong>When is the final report due?</strong></div><div><span>SOURCE</span><strong>Agreement · cited page</strong></div><div><span>REVIEW</span><strong>Human decision required</strong></div></div></div>
