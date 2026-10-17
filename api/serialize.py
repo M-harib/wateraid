@@ -122,10 +122,37 @@ def issues_payload(findings: list[Finding]) -> list[dict]:
 def finding_to_answer(f: Finding) -> dict:
     """A Finding -> frontend AnswerSchema for POST /ask."""
     status = "answered" if f.status == Status.confirmed else f.status.value
+    evidence = [evidence_light(e) for e in f.evidence if e.ref.doc_id in PACK_DOCS]
+    verified = [e for e in f.evidence if e.ref.doc_id in PACK_DOCS and e.verified]
+    if not evidence or len(verified) != len(evidence):
+        confidence = {"level": "low", "reason": "The answer has incomplete or unverified source support."}
+    elif f.status == Status.confirmed:
+        confidence = {"level": "high", "reason": "The answer is supported by verified quotations from the supplied documents."}
+    else:
+        confidence = {"level": "medium", "reason": "Verified sources were found, but they conflict or require human interpretation."}
+
+    computed_result = f.computed.result if f.computed and isinstance(f.computed.result, dict) else {}
+    supplied_missing = computed_result.get("missing_information", [])
+    missing_information = [item for item in supplied_missing if isinstance(item, str) and item.strip()]
+    if f.status == Status.not_found and not missing_information:
+        searched = ", ".join(f.searched) if f.searched else "the available sources"
+        missing_information.append(f"The information needed to answer was not found in {searched}.")
+    elif f.status == Status.conflict and f.conflict:
+        missing_information.append(f.conflict.question)
+    elif f.status == Status.needs_review:
+        missing_information.append("The sources support only a qualified answer; human interpretation is still required.")
+
+    conflicting = evidence if f.status == Status.conflict else []
+    supporting = [] if f.status == Status.conflict else evidence
     return {
         "answer": f.claim or "No answer could be supported from the provided documents.",
         "status": status,
-        "evidence": [evidence_light(e) for e in f.evidence if e.ref.doc_id in PACK_DOCS],
+        "confidence": confidence,
+        "supportingEvidence": supporting,
+        "conflictingEvidence": conflicting,
+        "missingInformation": missing_information,
+        "suggestedNextAction": _next_action(f),
+        "evidence": evidence,
     }
 
 

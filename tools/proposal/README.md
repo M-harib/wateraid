@@ -23,7 +23,7 @@ from tools.proposal import ProposalAssistant
 
 # After the shared Core has been ingested in the application's async lifespan:
 proposal = ProposalAssistant(core, OpenRouterLLM())
-await proposal.startup()  # warms the three priority intents, checklist and reviewer mapping
+await proposal.startup()  # concurrently runs three checks, checklist and reviewer mapping
 
 await proposal.chat_finding(question)  # open-ended chat over files 01–06
 await proposal.chat_finding(question, ["01", "02"])  # optional API-only restriction
@@ -39,6 +39,11 @@ functions are ready to mount there. The public `/proposal/ask` route calls
 `chat_finding(question)` so sample wording cannot trigger a predefined check.
 `finding(question)` and `ask(question)` retain internal strict-check dispatch for the
 evaluator and CLI.
+
+The mounted API starts `startup()` as a background task. `POST /proposal/run` returns a
+run status immediately, and `GET /proposal/run/status` reports the five step states and
+overall percentage. A second start request reuses the active run rather than duplicating
+model work. The dashboard polls that status and refreshes completed views as work lands.
 
 Cache keys include source text/locators/versions, absent-registry metadata, question,
 prompt version/content, scenario date and configured models. The cache is the existing

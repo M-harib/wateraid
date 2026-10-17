@@ -33,6 +33,13 @@ Combine `main` (teammate's backend + proposal review, through `f6b342c`) with th
 - Live backend with the `.env` key: `POST /proposal/ask` (Q5) returned a cited conflict (01 p.5 vs 03 p.2), quotes verified against page text. `POST /proposal/run` ×3: 66 s / 75 s / 31 s; 67/68 quotes matched page text (the miss is word-exact but joins two logic-model table rows with ";"). A cited writing suggestion for the cost-share page returned "answered" with a verified 02 p.1 quote.
 - Playwright (Chrome) on a connected dev server: proposal review 16 checklist rows, findings, 9 reviewer rows, nav badge; cited issue opens with context, review button and 3 PDF highlights; draft from case proposal (6 pages) → cited feedback → Add to doc (source notes) → Approve; calendar; dark mode; 0 px mobile overflow on proposal, draft, overview; no console errors after the key fix.
 
+## Merge into main (Claude)
+
+- Merged `origin/main` (PR #5, an earlier water-theme + main integration; its resolution is a subset of ours, so ours kept plus its Ask-panel excerpt highlighting and highlight clearing on document switch) and `origin/feat/proposal` `10c80f8` (structured answers + background review progress).
+- `10c80f8` changed the API contract: `POST /proposal/run` now returns 202 + run status; the frontend polls `GET /proposal/run/status`. Ported into the water-theme UI: progress bar with steps on the Proposal review card (also drives the draft desk's run button), structured `AnswerPanel` (direct answer, evidence confidence, supporting/conflicting evidence, missing information, next action). New CSS uses theme tokens.
+- Verified: `pytest -q` 165 passed; `tsc` and `npm run build` pass; live run returned 202 and progressed to completed; Q5 answer shows medium confidence and conflicting evidence; Playwright: progress steps render, answer citation opens the PDF with highlights, 0 px mobile overflow, no console errors.
+- New backend issue: `startup()` now runs all five steps concurrently; the checklist step then failed in 2 of 2 runs ("Response must be a finite JSON object"), versus 1 of 3 when sequential.
+
 ## Open issues (Claude)
 
 - **Backend, for the proposal owner:** "Cost Share Vs Call" failed in all 3 full runs (`tools/proposal/evidence.py` `cited_percentage` rejects quotes with zero or several percentages); the checklist failed once with "Response must be a finite JSON object"; checklist row count varies (14 vs 16). Every `/proposal/ask` is stored as a proposal finding, so writing-help requests appear as "Generic Qa" priority findings.
@@ -243,3 +250,32 @@ Verification:
 
 A fresh live-model answer-quality run still requires restoring the exhausted OpenRouter
 account balance.
+
+### Structured answers and asynchronous proposal review - 2026-10-17
+
+Expanded the API answer view without changing `core/schema.py`. Both document and proposal
+answers now expose a direct answer, evidence-confidence level and reason, separate supporting
+and conflicting evidence, missing information, and a suggested next action. The dashboard
+renders the recommendation in its own labelled block so it cannot be mistaken for a document
+fact. Existing `answer`, `status`, and `evidence` fields remain for compatibility.
+
+Changed the full proposal review into a tracked background job. `POST /proposal/run` returns
+HTTP 202 immediately, and `GET /proposal/run/status` reports five step states plus completed
+count and percentage. The three focused checks, checklist, and reviewer mapping run
+concurrently within the shared model semaphore. Duplicate start requests reuse the active
+run, the dashboard polls every 800 ms, partial stored views remain readable, and lifespan
+shutdown cancels an unfinished task cleanly.
+
+Verification:
+
+- `uv run pytest -q` - 165 passed with two upstream deprecation warnings.
+- `npm run build` - TypeScript and Vite passed; the existing PDF chunk-size warning remains.
+- A live background start returned in 114 ms and visibly advanced 0%, 20%, 40%, 60%, 80%,
+  then 100% over about 71 seconds. The dashboard stayed usable during the run.
+- The live run returned nine reviewer mappings and surfaced two invalid model extractions as
+  named retryable failures; it did not silently accept them.
+- A live open-ended partner question returned an accurate direct answer with high evidence
+  confidence and two verified proposal citations, with conflicts, gaps, and the recommendation
+  serialized separately.
+- A 1440 px Edge headless render verified the in-progress step list, progress bar, partial
+  findings, composer, and responsive card layout.

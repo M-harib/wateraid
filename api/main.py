@@ -1,4 +1,4 @@
-"""FastAPI app exposing the three endpoints the frontend calls, with CORS.
+"""FastAPI app exposing the dashboard endpoints, with CORS.
 The web framework lives only here; core stays framework-agnostic.
 
 Run: uv run python -m api.main   (serves on http://localhost:8010; set PORT to override)
@@ -19,6 +19,7 @@ from tools.compliance import ComplianceAssistant
 from tools.proposal import ProposalAssistant
 
 from .fixtures import FIXTURE_ANSWER, FIXTURE_FINDINGS
+from .proposal_run import ProposalRunTracker
 from .serialize import (
     checklist_rows_to_view,
     finding_to_answer,
@@ -60,7 +61,11 @@ def create_app(*, core: Core | None = None, llm=None) -> FastAPI:
         app.state.core = c
         app.state.assistant = ComplianceAssistant(c, model)
         app.state.proposal = ProposalAssistant(c, model)
-        yield
+        app.state.proposal_run = ProposalRunTracker()
+        try:
+            yield
+        finally:
+            await app.state.proposal_run.close()
 
     app = FastAPI(title="Grant Compliance API", lifespan=lifespan)
     app.add_middleware(
@@ -114,11 +119,14 @@ def create_app(*, core: Core | None = None, llm=None) -> FastAPI:
             return JSONResponse({"detail": finding.claim}, status_code=503)
         return finding_to_answer(finding)
 
-    @app.post("/proposal/run")
+    @app.post("/proposal/run", status_code=202)
     async def proposal_run(request: Request):
-        """Pre-run Q5/Q21/Q23, the call checklist, and reviewer mapping."""
-        await request.app.state.proposal.startup()
-        return proposal_payload(request.app.state.core.findings.all())
+        """Start the review in the background and return immediately."""
+        return await request.app.state.proposal_run.start(request.app.state.proposal)
+
+    @app.get("/proposal/run/status")
+    async def proposal_run_status(request: Request):
+        return request.app.state.proposal_run.snapshot()
 
     @app.get("/proposal/checklist")
     async def proposal_checklist(request: Request):

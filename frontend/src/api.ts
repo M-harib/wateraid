@@ -8,10 +8,16 @@ export type DashboardConnection =
 
 const FindingListSchema = z.union([z.array(FindingSchema), z.object({ findings: z.array(FindingSchema) })])
 const RequirementListSchema = z.union([z.array(RequirementSchema), z.object({ obligations: z.array(RequirementSchema) })])
+const AnswerEvidenceSchema = z.object({ documentId: z.enum(['00', '01', '02', '03', '04', '05', '06']), locator: z.object({ page: z.number().int().positive().optional(), section: z.string().optional(), sheet: z.string().optional(), cells: z.string().optional() }), excerpt: z.string().optional() })
 const AnswerSchema = z.object({
   answer: z.string().min(1),
   status: z.enum(['answered', 'conflict', 'not_found', 'needs_review']),
-  evidence: z.array(z.object({ documentId: z.enum(['00', '01', '02', '03', '04', '05', '06']), locator: z.object({ page: z.number().int().positive().optional(), section: z.string().optional(), sheet: z.string().optional(), cells: z.string().optional() }), excerpt: z.string().optional() })).default([]),
+  confidence: z.object({ level: z.enum(['high', 'medium', 'low']), reason: z.string().min(1) }).default({ level: 'low', reason: 'Confidence was not supplied by the analysis service.' }),
+  supportingEvidence: z.array(AnswerEvidenceSchema).default([]),
+  conflictingEvidence: z.array(AnswerEvidenceSchema).default([]),
+  missingInformation: z.array(z.string().min(1)).default([]),
+  suggestedNextAction: z.string().min(1).default('Review the cited evidence.'),
+  evidence: z.array(AnswerEvidenceSchema).default([]),
 }).superRefine((answer, context) => {
   if (answer.status === 'answered' && answer.evidence.length === 0) context.addIssue({ code: 'custom', path: ['evidence'], message: 'An answer needs cited evidence.' })
   if (answer.status === 'conflict' && answer.evidence.length < 2) context.addIssue({ code: 'custom', path: ['evidence'], message: 'A conflict needs both source statements.' })
@@ -127,8 +133,36 @@ export async function loadProposalWorkspace(): Promise<ProposalWorkspace> {
   return parseProposal(await requestJson('/proposal', {}, 20_000))
 }
 
-export async function runProposalChecks(): Promise<ProposalWorkspace> {
-  return parseProposal(await requestJson('/proposal/run', { method: 'POST' }, 360_000))
+const ProposalRunStatusSchema = z.object({
+  runId: z.string().uuid().nullable(),
+  status: z.enum(['idle', 'running', 'completed', 'failed']),
+  completed: z.number().int().nonnegative(),
+  total: z.number().int().positive(),
+  percent: z.number().int().min(0).max(100),
+  steps: z.array(z.object({
+    id: z.string().min(1),
+    label: z.string().min(1),
+    status: z.enum(['pending', 'running', 'completed', 'failed']),
+  })),
+  startedAt: z.string().nullable(),
+  finishedAt: z.string().nullable(),
+  error: z.string().nullable(),
+})
+export type ProposalRunStatus = z.infer<typeof ProposalRunStatusSchema>
+
+function parseRunStatus(body: unknown): ProposalRunStatus {
+  const parsed = ProposalRunStatusSchema.safeParse(body)
+  if (!parsed.success) throw new Error('Proposal progress did not match the dashboard schema')
+  return parsed.data
+}
+
+/** Starts the review in the background; poll loadProposalRunStatus until it completes or fails. */
+export async function runProposalChecks(): Promise<ProposalRunStatus> {
+  return parseRunStatus(await requestJson('/proposal/run', { method: 'POST' }, 20_000))
+}
+
+export async function loadProposalRunStatus(): Promise<ProposalRunStatus> {
+  return parseRunStatus(await requestJson('/proposal/run/status', {}, 20_000))
 }
 
 export async function askProposalQuestion(question: string, documentIds?: string[]): Promise<AskAnswer> {

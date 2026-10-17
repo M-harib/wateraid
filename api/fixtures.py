@@ -24,5 +24,10 @@ FIXTURE_FINDINGS = [
 FIXTURE_ANSWER = {
     "answer": "CONTRACT EXAMPLE – connect the analysis service with an API key for real answers.",
     "status": "not_found",
+    "confidence": {"level": "low", "reason": "No analysis service is connected."},
+    "supportingEvidence": [],
+    "conflictingEvidence": [],
+    "missingInformation": ["A source-backed answer has not been generated."],
+    "suggestedNextAction": "Connect the analysis service and ask again.",
     "evidence": [],
 }
