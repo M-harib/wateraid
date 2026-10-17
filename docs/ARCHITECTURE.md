@@ -23,10 +23,14 @@ This is a proposed design, not an implemented system. Adjust it after inspecting
 - **Review:** Store human decisions separately from regenerated findings. If evidence locations or content behind a decision change, flag the decision as stale. A later resolution becomes new citable evidence.
 - **UI:** Show a short action queue and allow opening the exact page or sheet/cell evidence. Do not bind UI components directly to raw model responses.
 
+## Current frontend boundary
+
+`frontend/` is a React/Vite/TypeScript app. Its landing page leads into a dashboard with separate Q&A, issues, obligations, calendar, source library, and review views. The source library opens the original PDF in the main content area. The build plan proposes a shared finding store and `POST /ask`, `GET /findings`, `GET /obligations`, and `GET /calendar` APIs. The frontend currently uses provisional, validated view models in `frontend/src/api.ts` and `frontend/src/domain.ts`; map the eventual `backend/core/schema.py` responses into them or replace them with generated types when the backend contract exists. No frontend component calls a model.
+
 ## Model use and cost
 
 Keep model calls behind an adapter. Prefer rules for routing when adequate, a cheaper model for repeatable extraction, and a stronger model only for difficult cross-document language analysis. Validate every response. Use a code-based quote verifier before marking text as verified. Cache extraction by document version and content hash; do not add a vector database unless measured retrieval cost or quality demands it.
 
 ## Unresolved design choices
 
-The exact schema, parser, web stack, storage format, model tiers, and urgency rubric remain open until the pack is inspected and a first slice is tested. Record choices in `docs/DECISIONS.md` before treating them as settled.
+The frontend stack is implemented. The exact backend schema, parser, storage format, model tiers, and urgency rubric remain open in this repository until the backend work is integrated. Record choices in `docs/DECISIONS.md` before treating them as settled.

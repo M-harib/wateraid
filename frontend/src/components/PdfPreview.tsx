@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { ChevronLeft, ChevronRight, FileWarning } from 'lucide-react'
+import { ChevronLeft, ChevronRight, FileWarning, ZoomIn, ZoomOut } from 'lucide-react'
 import { Document, Page, pdfjs } from 'react-pdf'
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString()
@@ -15,6 +15,7 @@ export function PdfPreview({ title, url, page, onPageChange }: Props) {
   const containerRef = useRef<HTMLDivElement>(null)
   const [width, setWidth] = useState(290)
   const [numPages, setNumPages] = useState<number>()
+  const [zoom, setZoom] = useState(1)
 
   useEffect(() => {
     const element = containerRef.current
@@ -24,7 +25,7 @@ export function PdfPreview({ title, url, page, onPageChange }: Props) {
     return () => observer.disconnect()
   }, [])
 
-  useEffect(() => setNumPages(undefined), [url])
+  useEffect(() => { setNumPages(undefined); setZoom(1) }, [url])
 
   const currentPage = Math.max(1, Math.min(page ?? 1, numPages ?? Number.MAX_SAFE_INTEGER))
 
@@ -39,7 +40,7 @@ export function PdfPreview({ title, url, page, onPageChange }: Props) {
         >
           <Page
             pageNumber={currentPage}
-            width={width}
+            width={Math.round(width * zoom)}
             renderTextLayer={false}
             renderAnnotationLayer={false}
             loading={<div className="pdf-message">Rendering page…</div>}
@@ -50,6 +51,10 @@ export function PdfPreview({ title, url, page, onPageChange }: Props) {
         <button type="button" onClick={() => onPageChange(currentPage - 1)} disabled={currentPage <= 1} aria-label="Previous PDF page"><ChevronLeft size={15} /></button>
         <span>Page {currentPage}{numPages ? ` of ${numPages}` : ''}</span>
         <button type="button" onClick={() => onPageChange(currentPage + 1)} disabled={!numPages || currentPage >= numPages} aria-label="Next PDF page"><ChevronRight size={15} /></button>
+        <span className="pdf-controls-divider" />
+        <button type="button" onClick={() => setZoom((value) => Math.max(1, value - 0.25))} disabled={zoom <= 1} aria-label="Zoom out"><ZoomOut size={15} /></button>
+        <span>{Math.round(zoom * 100)}%</span>
+        <button type="button" onClick={() => setZoom((value) => Math.min(2, value + 0.25))} disabled={zoom >= 2} aria-label="Zoom in"><ZoomIn size={15} /></button>
       </div>
     </div>
   )

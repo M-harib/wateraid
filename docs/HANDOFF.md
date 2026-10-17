@@ -10,26 +10,29 @@ Codex
 
 ## Task
 
-Build the white-theme dashboard frontend for the shared compliance milestone. See `docs/CURRENT_TASK.md`.
+Redesign the frontend around the working build plan: a focused landing page, separate dashboard views, and original documents in the main evidence canvas. Branch: `feat/landing-dashboard-workspace`.
 
-## What was done
+## What changed
 
-- Added `frontend/` with a responsive React/Vite/TypeScript/Tailwind dashboard based on the white document-workspace reference and the split-view layout reference.
-- Bundled only the seven A6 source files into the frontend. The evidence desk renders PDF pages with React-PDF and links to original workbooks.
-- Added source-pack preview mode with three guide-question prompts, validated `GET /findings` and `GET /obligations` adapters for future results, and browser-local human review records.
-- Documented the proposed frontend/backend contract in `frontend/README.md` and updated the frontend stack decision.
-
-## Source availability
-
-The source pack files `00`–`06` are now present in `assets/`. Codex read file `00`: page 1 confirms the fictional Water Care case and 30 June 2022 scenario; page 3 lists 25 judge questions. Other grant clauses, answers, and conflicts still need verification against their original files. Two ESDC PDFs are also in `assets/` and are outside the core A6 pack.
+- Replaced the all-in-one dashboard with a Rezzy-inspired landing page at `/` and a white workspace at `/dashboard`.
+- Split the workspace into Overview, Ask, Issues, Obligations, Reporting calendar, Source library, and Review history. The PDF is now the central canvas in Source library, with citation cards above it and a compact file list to the left.
+- Kept source-pack preview honest: seven original files and guide questions 8, 11, and 24 are available, but no generated answers or findings are seeded.
+- Added a provisional `POST /ask` adapter. `GET /findings` and `GET /obligations` still feed the Issues and Obligations views; Calendar is projected from cited obligation dates until the canonical calendar route exists. All responses are validated before display.
+- Preserved browser-local human review, including a stale indicator when a finding or its evidence changes. Removed the unused right-panel evidence component.
+- Updated `AGENTS.md`, architecture, decisions, and frontend README to treat `docs/Taps_for_Rights_Build_Plan.pdf` as the working plan. The original source pack remains authoritative for grant facts.
 
 ## Verification
 
-`npm run build` passed (TypeScript and Vite) after the final UI edits; `git diff --check` passed. Local Vite returned HTTP 200. Headless Chrome rendered the overview and a PDF page, opened another document, and showed no horizontal overflow on mobile or page errors. Browser smoke checks with temporary mocked API responses verified a requirement and its cited PDF page, and a finding review decision saved to local history. The PDF viewer is loaded on demand; Vite reports a size warning for that PDF chunk. No backend is connected yet.
+- `npm run build` passed (TypeScript and Vite). Vite still warns that the on-demand PDF chunk exceeds 500 kB.
+- Headless Chrome checked landing → workspace → source library → Q&A on desktop, and landing → workspace and the source canvas on a 390 px viewport. The PDF rendered in the center; mobile zoom increased its width within a horizontally scrollable viewer without page overflow or page errors.
+- A browser smoke test with temporary mocked `GET /findings`, `GET /obligations`, and `POST /ask` verified a two-source finding with a new kind and resolver, PDF navigation, a clarification review saved to history, and an answer citation opening the source canvas. These fixtures live outside product code.
+- Final `npm run build` and `git diff --check` passed.
 
-## Recommended next step
+## Integration notes and limits
 
-The newly added `docs/Taps_for_Rights_Build_Plan.pdf` names `core/schema.py` as the canonical contract. Backend owners should finish that schema and FastAPI routes; then update `frontend/src/api.ts` to map canonical responses into its provisional view model. Keep pack-specific answers out of frontend code. The review log needs a backend endpoint before decisions can be shared across staff. The PDF view opens the cited page and displays the excerpt separately; exact text highlighting is still pending.
+The build plan names `core/schema.py` as the canonical backend/frontend contract; `docs/WORKSTREAMS.md` places it at `backend/core/schema.py` and assigns W1 ownership. The frontend's Zod types and Q&A response are provisional. The dashboard now accepts new `Finding.kind` strings and displays an optional `resolver`, resolving two of the frontend contract points in `docs/WORKSTREAMS.md`. Map the canonical FastAPI output into these view models or generate types from OpenAPI; do not force the backend to match a temporary frontend shape. No backend is connected in the default preview. Q&A requires `POST /ask`; source quote verification belongs to the backend. The review log is local to one browser. PDF citations open a page and display an excerpt above it; exact in-page highlighting remains pending.
+
+The teammate-provided build-plan PDF, `docs/WORKSTREAMS.md`, and the concurrent edit to `docs/CURRENT_TASK.md` were published in a separate documentation commit without changing their content. The reference screenshots `design/design-3.png` and `design/design-4.png` remain untracked and are not required by the app.
 
 ## Review findings
 

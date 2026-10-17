@@ -24,13 +24,14 @@ export const EvidenceSchema = z.object({
 
 export const FindingSchema = z.object({
   id: z.string().min(1),
-  kind: z.enum(['deadline_conflict', 'reporting_gap', 'evidence_gap', 'other']),
+  kind: z.string().min(1),
   title: z.string().min(1),
   summary: z.string().min(1),
   priority: z.enum(['high', 'medium', 'low']),
   state: z.enum(['needs_review', 'needs_clarification', 'insufficient_evidence']),
   nextAction: z.string().min(1),
   owner: z.string().nullable().optional(),
+  resolver: z.string().nullable().optional(),
   dueOn: z.string().nullable().optional(),
   evidence: z.array(EvidenceSchema).min(1),
 }).superRefine((finding, context) => {

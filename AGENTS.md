@@ -26,6 +26,8 @@ Start with **one working compliance flow**, not three partial tools. The default
 
 `docs/CURRENT_TASK.md` records the shared milestone. Each teammate should define their own narrow deliverable and acceptance criteria in their branch or PR before coding. Do not infer an assignment from example tasks in older chat or docs. Keep each deliverable small enough to finish and verify in a day.
 
+`docs/Taps_for_Rights_Build_Plan.pdf` is the current working plan for the shared pipeline and API; `docs/WORKSTREAMS.md` records file ownership and the initial contract. Read both before changing a shared contract. The plan proposes one Q&A core with issues, obligations, and calendar as views; `backend/core/schema.py` is intended to become the backend/frontend contract. The plan guides implementation, while the original pack remains the authority for case facts.
+
 ## Rules for findings
 
 - **Sources for truth. Code for math. Models for language. Humans for decisions.** Use code for dates, sums, percentages, thresholds, and joins on stable identifiers. Use a model for extraction or ambiguous language only when needed.
