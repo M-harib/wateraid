@@ -6,13 +6,31 @@
 
 ## Last agent
 
-Codex
+Claude (this section); Codex before it (sections below, committed as `3430f2c`).
 
 ## Task
 
-Prepare a focused project-manager demo flow with a dedicated document intake and proposal template. Branch: `feat/water-theme`, based on `feat/unified-evidence-projects` (`84ed2b2`). Work is uncommitted.
+Connect the proposal review desk to the real backend, and add a Reporting Calendar date picker with sample data. Branch: `feat/water-theme` (pushed at `3430f2c`); the changes below are uncommitted.
 
-## What changed
+## What changed (Claude)
+
+- **Proposal review desk → real backend.** `frontend/src/api.ts` adds `loadProposal` (`GET /proposal`), `runProposalChecks` (`POST /proposal/run`) and `askProposal` (`POST /proposal/ask`), each Zod-validated, with timeouts sized for model calls (8 s / 300 s / 150 s) and the backend's `detail` message surfaced. For the demo project only, `DraftWorkspace` loads the cached proposal view, offers "Run proposal checks", lists call-checklist rows (Met / Not met / Unclear / Not addressed) that open their cited page, lists proposal issues with who decides, shows backend failures, and sends writing help to `/proposal/ask` (falls back to `/ask` when the proposal routes are absent). Local projects still never call the API.
+- **Reporting Calendar.** `components/ReportingCalendar.tsx` + `calendar.css`: a month grid that works as the date picker, a jump-to-date input, "Next due after case date", and a detail panel per date with project tag, category, frequency, timing relative to the 30 June 2022 case date, period, verbatim due rule, required contents, reference forms, "Needs clarification" notes, and buttons that open the schedule and contents pages in file 03. Shown only when the backend returns no dated obligations; backend dates keep the existing list.
+- **Sample data, isolated.** `frontend/src/calendarMock.ts` holds rules 4.5–4.10 from 03 Appendix D §3–4 and generates dates in the browser from them. Every item is tagged "Sample data", and the page states it is not a backend finding and does not show submission. This puts pack-derived dates in product code, which AGENTS.md normally forbids: delete the module (and its use in `ReportingCalendar`) once `GET /obligations` returns dated items. 4.5 (due with each advance request) is listed as "No fixed date" rather than placed on the calendar.
+
+## Verification (Claude)
+
+- `npm run build` passed after each change (TypeScript + Vite).
+- Backend: `feat/proposal` run from a separate worktree (scratchpad), Python 3.14 venv with the pinned `pyproject.toml` deps; `pytest -q`: 155 passed. Server on `127.0.0.1:8010`: `/healthz` ok; `GET /proposal` returned empty views; `POST /proposal/ask` returned 503 because no model key was configured at the time.
+- Playwright (Chrome) against `vite preview`: calendar defaults to 30 Sep 2022 (1 report); 14 Nov 2022 shows 4.6, 4.7, 4.8 with two clarification notes; jumping to 15 May 2022 shows 4.6 and 4.9 marked "Due date passed 46 days before 2022-06-30"; a source button opens the documents view; dark mode renders; 390 px mobile has 0 px horizontal overflow; no page errors.
+- **Not yet verified:** a real cited issue and writing suggestion from the model, and the full demo rehearsal. A key now exists in the gitignored root `.env`; the next agent should restart the backend with it, run proposal checks, check one issue's quote against its page and one suggestion's citations, then rehearse.
+
+## Open issues (Claude)
+
+- Proposal routes exist only on unmerged `feat/proposal`; `main`'s backend lacks them.
+- Clicking a proposal issue opens its page, but the evidence-workspace context panel looks up compliance findings only, so it shows no summary for proposal issues (`Dashboard.tsx`).
+
+## What changed (Codex)
 
 - Replaced the pastel/wave-card look with white and charcoal surfaces, a small blue accent, and a fine vector wave inspired by `design/dynamic-wave.avif`. Landing copy now leads with “Monitor your compliance with confidence.” Light/dark choice remains.
 - Added `Project documents` as the demo project's opening view. New local projects open an independent intake. PDF, TXT, MD, DOCX, and XLSX originals are stored per project in browser IndexedDB; text is extracted from selectable PDF, TXT, and MD. Users can download/remove originals and move extracted text into the draft. DOCX/XLSX and scanned PDFs need an extraction/OCR service before they can become editable text.
@@ -21,7 +39,7 @@ Prepare a focused project-manager demo flow with a dedicated document intake and
 - Added human draft approval, automatically cleared on subsequent edits. Print / save PDF uses the browser print dialog and exports selectable text. Scanned PDF OCR is not implemented; import reports the limitation.
 - Existing Issues, Obligations, Evidence workspace, and finding review flows remain available in the sidebar.
 
-## Verification
+## Verification (Codex)
 
 - `npm run build` passed after the editor integration; TypeScript passed. PDF import loads dynamically, keeping the initial app chunk below Vite's 500 kB warning threshold.
 - Headless Chrome checked the landing light/dark toggle, persistence, project navigation, and mobile overflow. The earlier editor smoke check passed for routing, editing, approval/reset, TXT intake, section reorder, and print-to-PDF generation. A new intake/template smoke check passed for new-project routing, TXT upload persistence, moving text into a draft, six template pages, page focus, reorder, and mobile overflow; no page errors.

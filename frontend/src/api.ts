@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { FindingSchema, RequirementSchema, type DashboardData, type Finding, type Requirement } from './domain'
+import { EvidenceSchema, FindingSchema, RequirementSchema, type DashboardData, type Finding, type Requirement } from './domain'
 
 export type DashboardConnection =
   | { mode: 'preview'; data: DashboardData }
@@ -67,6 +67,75 @@ export async function loadDashboard(): Promise<DashboardConnection> {
   } finally {
     window.clearTimeout(timeout)
   }
+}
+
+// Proposal tool (backend `feat/proposal`): GET /proposal returns cached views only;
+// POST /proposal/run starts the model checks; POST /proposal/ask answers one question.
+const ChecklistRowSchema = z.object({
+  id: z.string().min(1),
+  category: z.string(),
+  requirement: z.string().min(1),
+  status: z.enum(['met', 'not_met', 'unclear', 'not_addressed']),
+  reason: z.string(),
+  evidence: z.array(EvidenceSchema).default([]),
+  absentSources: z.array(z.unknown()).default([]),
+})
+const ProposalViewSchema = z.object({
+  findings: z.array(FindingSchema).default([]),
+  checklist: z.array(ChecklistRowSchema).default([]),
+  failures: z.array(z.string()).default([]),
+})
+export type ChecklistRow = z.infer<typeof ChecklistRowSchema>
+export type ProposalView = z.infer<typeof ProposalViewSchema>
+
+function apiBase(): string {
+  const baseUrl = import.meta.env.VITE_API_BASE_URL?.trim().replace(/\/$/, '')
+  if (!baseUrl) throw new Error('Connect the analysis service first.')
+  return baseUrl
+}
+
+async function requestJson(path: string, init: RequestInit, timeoutMs: number): Promise<unknown> {
+  const controller = new AbortController()
+  const timeout = window.setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    const response = await fetch(`${apiBase()}${path}`, { ...init, signal: controller.signal })
+    const body = await response.json().catch(() => null)
+    if (!response.ok) {
+      const detail = body && typeof body === 'object' && 'detail' in body && typeof body.detail === 'string' ? body.detail : `status ${response.status}`
+      throw new Error(`Analysis service: ${detail}`)
+    }
+    return body
+  } catch (error) {
+    if (error instanceof DOMException && error.name === 'AbortError') throw new Error('The analysis service did not answer in time. Try again.')
+    throw error
+  } finally {
+    window.clearTimeout(timeout)
+  }
+}
+
+function parseProposal(body: unknown): ProposalView {
+  const parsed = ProposalViewSchema.safeParse(body)
+  if (!parsed.success) throw new Error('Proposal response did not match the frontend schema')
+  return parsed.data
+}
+
+export async function loadProposal(): Promise<ProposalView> {
+  return parseProposal(await requestJson('/proposal', {}, 8000))
+}
+
+export async function runProposalChecks(): Promise<ProposalView> {
+  return parseProposal(await requestJson('/proposal/run', { method: 'POST' }, 300_000))
+}
+
+export async function askProposal(question: string, documentIds?: string[]): Promise<AskAnswer> {
+  const body = await requestJson('/proposal/ask', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(documentIds?.length ? { question, documentIds } : { question }),
+  }, 150_000)
+  const parsed = AnswerSchema.safeParse(body)
+  if (!parsed.success) throw new Error('Proposal answer did not match the frontend schema')
+  return parsed.data
 }
 
 export async function askQuestion(question: string): Promise<AskAnswer> {

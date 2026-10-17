@@ -6,6 +6,7 @@ import { ReviewDialog } from './components/ReviewDialog'
 import { AskPanel } from './components/AskPanel'
 import { ThemeToggle } from './components/ThemeToggle'
 import { DraftWorkspace } from './components/DraftWorkspace'
+import { ReportingCalendar } from './components/ReportingCalendar'
 import { ProjectDocuments } from './components/ProjectDocuments'
 import { documentById, documents } from './documents'
 import { evidenceLocation, type Finding, type Requirement } from './domain'
@@ -198,8 +199,8 @@ export function Dashboard({ section, onNavigate, onExit, onProjects, theme, onTo
         </>}
 
         {section === 'calendar' && <>
-          <SectionHeading eyebrow="REPORTING CALENDAR" title="Dates from the sources." subtitle="Dates appear here only when attached to a cited obligation. Conflicting dates stay in the issues view." aside={<span className="heading-count">{dates.length} sourced dates</span>} />
-          {dates.length ? <div className="calendar-list">{dates.map((item) => <button type="button" key={item.id} onClick={() => openRequirement(item)}><span className="calendar-date">{formatDate(item.dueOn!)}</span><span><strong>{item.title}</strong><small>{item.category} · {item.evidence.length} source{item.evidence.length === 1 ? '' : 's'}</small></span><ChevronRight size={17} /></button>)}</div> : <EmptyState icon={CalendarDays} title="No sourced dates yet" description="The backend will calculate rule dates and compare them with asserted dates before this calendar is populated." />}
+          <SectionHeading eyebrow="REPORTING CALENDAR" title="Dates from the sources." subtitle={dates.length ? 'Dates appear here only when attached to a cited obligation. Conflicting dates stay in the issues view.' : 'Pick a date to see which reports fall due. Sample schedule from the agreement until the backend returns cited obligations.'} aside={<span className="heading-count">{dates.length ? `${dates.length} sourced dates` : 'Sample schedule'}</span>} />
+          {dates.length ? <div className="calendar-list">{dates.map((item) => <button type="button" key={item.id} onClick={() => openRequirement(item)}><span className="calendar-date">{formatDate(item.dueOn!)}</span><span><strong>{item.title}</strong><small>{item.category} · {item.evidence.length} source{item.evidence.length === 1 ? '' : 's'}</small></span><ChevronRight size={17} /></button>)}</div> : <ReportingCalendar asOf={connection.data.asOf} onOpenSource={openCitation} />}
         </>}
 
         {section === 'documents' && <>
