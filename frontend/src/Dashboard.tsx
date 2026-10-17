@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, ArrowRight, ArrowUpRight, BookOpenText, CalendarDays, CheckCircle2, ChevronRight, CircleAlert, ClipboardCheck, FileQuestion, FileSpreadsheet, FileText, FolderOpen, LayoutDashboard, Menu, MessageSquareText, PanelLeftClose, PanelLeftOpen, Search, ShieldCheck, X } from 'lucide-react'
-import { askProjectQuestion, askProposalQuestion, loadDashboard, loadProjectDocuments, loadProposalRunStatus, loadProposalWorkspace, projectDocumentFileUrl, runProposalChecks, type AskAnswer, type DashboardConnection, type ProjectDocument, type ProposalRunStatus } from './api'
+import { askProjectQuestion, askProposalQuestion, createProject, loadDashboard, loadProjectDocuments, loadProjects, loadProposalRunStatus, loadProposalWorkspace, projectDocumentFileUrl, runProposalChecks, type AskAnswer, type DashboardConnection, type ProjectDocument, type ProjectSummary, type ProposalRunStatus } from './api'
 import { BrandMark } from './Brand'
 import { ReviewDialog } from './components/ReviewDialog'
 import { AskPanel } from './components/AskPanel'
@@ -95,6 +95,8 @@ export function Dashboard({ section, onNavigate, onExit, onProjects, theme, onTo
   const [notice, setNotice] = useState('')
   const [selectedExcerpt, setSelectedExcerpt] = useState<string | undefined>()
   const [uploadedDocs, setUploadedDocs] = useState<ProjectDocument[]>([])
+  const [projects, setProjects] = useState<ProjectSummary[]>([])
+  const [projectId, setProjectId] = useState('taps-for-rights')
   const [proposal, setProposal] = useState<ProposalWorkspace>(emptyProposalWorkspace)
   const [proposalAvailable, setProposalAvailable] = useState(false)
   const [proposalLoading, setProposalLoading] = useState(false)
@@ -153,13 +155,26 @@ export function Dashboard({ section, onNavigate, onExit, onProjects, theme, onTo
     return () => window.clearTimeout(timeout)
   }, [notice])
 
-  // uploaded documents for this project: searchable + previewable in the evidence workspace
+  // available projects: populate the selector; keep the current selection if still present
   useEffect(() => {
     if (connection.mode !== 'connected') return
     let active = true
+    loadProjects().then((list) => {
+      if (!active) return
+      setProjects(list)
+      setProjectId((current) => (list.some((p) => p.projectId === current) ? current : list[0]?.projectId ?? current))
+    }).catch(() => { /* leave selector as-is */ })
+    return () => { active = false }
+  }, [connection.mode])
+
+  // uploaded documents for the selected project: searchable + previewable in the evidence workspace
+  useEffect(() => {
+    if (connection.mode !== 'connected') return
+    let active = true
+    setUploadedDocs([])
     const poll = async () => {
       try {
-        const r = await loadProjectDocuments('taps-for-rights')
+        const r = await loadProjectDocuments(projectId)
         if (!active) return
         setUploadedDocs(r.documents)
         if (r.documents.some((d) => d.status === 'queued' || d.status === 'ingesting')) window.setTimeout(poll, 1500)
@@ -167,12 +182,12 @@ export function Dashboard({ section, onNavigate, onExit, onProjects, theme, onTo
     }
     void poll()
     return () => { active = false }
-  }, [connection.mode])
+  }, [connection.mode, projectId])
 
   const findings = connection.data.findings
   const requirements = connection.data.requirements
   const readyUploads = useMemo(() => uploadedDocs.filter((d) => d.status === 'ready'), [uploadedDocs])
-  const uploadedAsDocs = useMemo(() => readyUploads.map((d) => ({ id: d.doc_id, shortTitle: d.filename, title: d.filename, category: 'Uploaded', format: (d.kind === 'pdf' ? 'PDF' : 'XLSX') as 'PDF' | 'XLSX', url: projectDocumentFileUrl('taps-for-rights', d.doc_id) })), [readyUploads])
+  const uploadedAsDocs = useMemo(() => readyUploads.map((d) => ({ id: d.doc_id, shortTitle: d.filename, title: d.filename, category: 'Uploaded', format: (d.kind === 'pdf' ? 'PDF' : 'XLSX') as 'PDF' | 'XLSX', url: projectDocumentFileUrl(projectId, d.doc_id) })), [readyUploads, projectId])
   // workspace lists only uploaded docs; docById also keeps bundled docs so finding citations still resolve in the preview
   const docById = useMemo(() => Object.fromEntries([...documents, ...uploadedAsDocs].map((d) => [d.id, d])) as Record<string, { id: string; shortTitle: string; title: string; category: string; format: 'PDF' | 'XLSX'; url: string }>, [uploadedAsDocs])
   const document = docById[selectedDocumentId] ?? uploadedAsDocs[0] ?? documents[0]
@@ -182,6 +197,7 @@ export function Dashboard({ section, onNavigate, onExit, onProjects, theme, onTo
   const focusedEvidence = focusedFinding?.evidence ?? focusedRequirement?.evidence ?? []
   const dates = useMemo(() => requirements.filter((item) => item.dueOn).sort((a, b) => (a.dueOn ?? '').localeCompare(b.dueOn ?? '')), [requirements])
   const currentReviewCount = findings.filter((item) => { const review = latestReviewFor(item.id, reviews); return review?.fingerprint === evidenceFingerprint(item) }).length
+  const projectName = projects.find((p) => p.projectId === projectId)?.name ?? 'Taps for Rights'
   const filteredDocuments = uploadedAsDocs.filter((item) => `${item.title} ${item.category}`.toLowerCase().includes(search.toLowerCase()))
   const filteredFindings = findings.filter((item) => `${item.title} ${item.summary}`.toLowerCase().includes(search.toLowerCase()))
   const filteredRequirements = requirements.filter((item) => `${item.title} ${item.statement}`.toLowerCase().includes(search.toLowerCase()))
@@ -191,6 +207,26 @@ export function Dashboard({ section, onNavigate, onExit, onProjects, theme, onTo
     setSearch('')
     if (next === 'documents') setFocus(null)
     onNavigate(next)
+  }
+
+  function changeProject(id: string) {
+    setProjectId(id)
+    setSelectedDocumentId('')
+    setSelectedPage(undefined)
+    setSelectedExcerpt(undefined)
+    setFocus(null)
+    setAnswer(null)
+  }
+
+  async function addProject() {
+    const name = window.prompt('New project name')?.trim()
+    if (!name) return
+    try {
+      const created = await createProject(name)
+      setProjects((list) => (list.some((p) => p.projectId === created.projectId) ? list : [...list, created]))
+      changeProject(created.projectId)
+      navigate('intake')
+    } catch (error) { setNotice(error instanceof Error ? error.message : 'Could not create the project.') }
   }
 
   function openAssistant() {
@@ -241,7 +277,7 @@ export function Dashboard({ section, onNavigate, onExit, onProjects, theme, onTo
     setAskError('')
     if (connection.mode !== 'connected') { setAskError('The analysis service is not connected yet. You can inspect the source files below.'); return }
     setAsking(true)
-    try { setAnswer(await askProjectQuestion('taps-for-rights', question.trim())) }
+    try { setAnswer(await askProjectQuestion(projectId, question.trim())) }
     catch (error) { setAskError(error instanceof Error ? error.message : 'The question service is unavailable.') }
     finally { setAsking(false) }
   }
@@ -311,7 +347,7 @@ export function Dashboard({ section, onNavigate, onExit, onProjects, theme, onTo
       <header className="dashboard-topbar"><button className="dashboard-mobile-menu" type="button" onClick={() => setMobileNav(true)} aria-label="Open navigation"><Menu size={21} /></button><span className="dashboard-crumb">Workspace <ChevronRight size={15} /> <strong>{nav.find((item) => item.section === section)?.title}</strong></span><div className="dashboard-topbar-actions"><span className={`service-state ${connection.mode === 'connected' ? 'connected' : ''}`}><i /> {connection.mode === 'connected' ? 'Analysis connected' : connection.mode === 'unavailable' ? 'Service unavailable' : 'Source pack preview'}</span><ThemeToggle theme={theme} onToggle={onToggleTheme} /></div></header>
 
       <main className={`dashboard-main dashboard-${section}`}>
-        {section === 'intake' && <BackendDocuments projectId="taps-for-rights" projectName="Taps for Rights" connected={connection.mode === 'connected'} />}
+        {section === 'intake' && <BackendDocuments projectId={projectId} projectName={projectName} projects={projects} onSelectProject={changeProject} onNewProject={addProject} connected={connection.mode === 'connected'} />}
         {section === 'draft' && <DraftWorkspace projectId="taps-for-rights" projectName="Taps for Rights" findings={findings} requirements={requirements} analysisConnected={connection.mode === 'connected'} proposal={proposalAvailable ? proposal : null} proposalBusy={proposalLoading} proposalError={proposalError} onRunProposal={runProposalReview} onOpenIssue={openFinding} onOpenRequirement={openRequirement} onOpenSource={openCitation} onOpenIntake={() => navigate('intake')} />}
 
         {section === 'proposal' && <>
@@ -352,7 +388,7 @@ export function Dashboard({ section, onNavigate, onExit, onProjects, theme, onTo
 
         {section === 'documents' && <>
           <SectionHeading eyebrow="EVIDENCE WORKSPACE / UPLOADED DOCUMENTS" title="Read, ask, and review." subtitle="Open one of your uploaded sources in the center. Ask questions alongside it and follow citations back to the original." />
-          <div className="workspace-toolbar"><div><label htmlFor="workspace-document">Document</label><select id="workspace-document" value={document.id} onChange={(event) => { setSelectedDocumentId(event.target.value); setSelectedPage(undefined); setSelectedExcerpt(undefined); setFocus(null) }}>{uploadedAsDocs.map((item) => <option key={item.id} value={item.id}>{item.shortTitle}</option>)}</select></div><button type="button" className={`workspace-assistant-toggle ${assistantOpen ? 'active' : ''}`} onClick={() => setAssistantOpen(!assistantOpen)} aria-expanded={assistantOpen}><MessageSquareText size={17} /> {assistantOpen ? 'Close assistant' : 'Ask the documents'}</button></div>
+          <div className="workspace-toolbar"><div><label htmlFor="workspace-project">Project</label><div className="workspace-project-select"><select id="workspace-project" value={projectId} onChange={(event) => { if (event.target.value === '__new__') void addProject(); else changeProject(event.target.value) }}>{projects.map((item) => <option key={item.projectId} value={item.projectId}>{item.name} ({item.documentCount})</option>)}<option value="__new__">+ New project…</option></select></div></div><div><label htmlFor="workspace-document">Document</label><select id="workspace-document" value={document?.id ?? ''} disabled={!uploadedAsDocs.length} onChange={(event) => { setSelectedDocumentId(event.target.value); setSelectedPage(undefined); setSelectedExcerpt(undefined); setFocus(null) }}>{uploadedAsDocs.length ? uploadedAsDocs.map((item) => <option key={item.id} value={item.id}>{item.shortTitle}</option>) : <option value="">No documents yet</option>}</select></div><button type="button" className={`workspace-assistant-toggle ${assistantOpen ? 'active' : ''}`} onClick={() => setAssistantOpen(!assistantOpen)} aria-expanded={assistantOpen}><MessageSquareText size={17} /> {assistantOpen ? 'Close assistant' : 'Ask the documents'}</button></div>
           {assistantOpen && <button className="assistant-mobile-cover" type="button" onClick={() => setAssistantOpen(false)} aria-label="Close assistant" />}
           <div className={`source-workspace ${assistantOpen ? 'with-assistant' : ''}`}>
             {!assistantOpen && <div className="source-rail"><span className="source-rail-label">SOURCE FILES</span><label className="source-search"><Search size={16} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Find a document" aria-label="Find a document" /></label>{filteredDocuments.map((item) => { const Icon = item.format === 'PDF' ? FileText : FileSpreadsheet; return <button type="button" key={item.id} className={`source-rail-item ${document.id === item.id ? 'active' : ''}`} onClick={() => { setSelectedDocumentId(item.id); setSelectedPage(undefined); setSelectedExcerpt(undefined); if (!focusedEvidence.some((evidence) => evidence.documentId === item.id) && !focusedInvestigation?.documentIds.includes(item.id)) setFocus(null) }}><span className="source-rail-icon"><Icon size={17} /></span><span><strong>{item.shortTitle}</strong><small>{item.id} · {item.format}</small></span></button> })}{filteredDocuments.length === 0 && <p className="no-results">No documents found.</p>}</div>}

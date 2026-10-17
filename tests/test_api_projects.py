@@ -61,6 +61,26 @@ def test_ask_after_ready_returns_answer_shape(tmp_path, monkeypatch):
         assert "confidence" in body and "evidence" in body
 
 
+def test_projects_list_and_create(tmp_path, monkeypatch):
+    with _client(tmp_path, monkeypatch) as c:
+        assert c.get("/projects").json()["projects"] == []
+        r = c.post("/projects", json={"name": "GAC 2024 Round"})
+        assert r.status_code == 201
+        assert r.json() == {"projectId": "gac-2024-round", "name": "GAC 2024 Round"}
+        listed = c.get("/projects").json()["projects"]
+        assert listed == [{"projectId": "gac-2024-round", "name": "GAC 2024 Round", "documentCount": 0, "ready": False}]
+        assert c.post("/projects", json={"name": "  "}).status_code == 400
+
+
+def test_created_project_name_persists_and_counts(tmp_path, monkeypatch):
+    with _client(tmp_path, monkeypatch) as c:
+        c.post("/projects", json={"name": "Coastal WASH"})
+        c.post("/projects/coastal-wash/documents", files=[("files", ("team.csv", CSV, "text/csv"))])
+        _wait_ready(c, "coastal-wash")
+        row = next(p for p in c.get("/projects").json()["projects"] if p["projectId"] == "coastal-wash")
+        assert row["name"] == "Coastal WASH" and row["documentCount"] == 1 and row["ready"] is True
+
+
 def test_file_serve_and_delete(tmp_path, monkeypatch):
     with _client(tmp_path, monkeypatch) as c:
         acc = c.post("/projects/demo/documents", files=[("files", ("team.csv", CSV, "text/csv"))]).json()["accepted"]

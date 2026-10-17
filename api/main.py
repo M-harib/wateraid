@@ -151,6 +151,21 @@ def create_app(*, core: Core | None = None, llm=None) -> FastAPI:
         rows = await request.app.state.proposal.reviewer_questions()
         return reviewer_rows_to_view(rows)
 
+    # --- projects ---
+
+    @app.get("/projects")
+    async def list_projects(request: Request):
+        return {"projects": request.app.state.workspace.list_projects()}
+
+    @app.post("/projects", status_code=201)
+    async def create_project(request: Request):
+        body = await request.json()
+        name = (body or {}).get("name", "").strip()
+        if not name:
+            return JSONResponse({"detail": "name is required"}, status_code=400)
+        corpus = await request.app.state.workspace.create(name)
+        return {"projectId": corpus.project_id, "name": corpus.name}
+
     # --- per-project uploaded documents (PDF / Excel / CSV) ---
 
     @app.post("/projects/{project_id}/documents", status_code=202)

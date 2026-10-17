@@ -176,6 +176,32 @@ export async function askProposalQuestion(question: string, documentIds?: string
   return parsed.data
 }
 
+// --- projects ---
+
+const ProjectSummarySchema = z.object({
+  projectId: z.string().min(1),
+  name: z.string().min(1),
+  documentCount: z.number().int().nonnegative(),
+  ready: z.boolean(),
+})
+export type ProjectSummary = z.infer<typeof ProjectSummarySchema>
+
+export async function loadProjects(): Promise<ProjectSummary[]> {
+  const body = await requestJson('/projects', {}, 20_000)
+  const parsed = z.object({ projects: z.array(ProjectSummarySchema) }).safeParse(body)
+  if (!parsed.success) throw new Error('Projects response did not match the dashboard schema')
+  return parsed.data.projects
+}
+
+export async function createProject(name: string): Promise<ProjectSummary> {
+  const body = await requestJson('/projects', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }),
+  }, 20_000)
+  const parsed = z.object({ projectId: z.string().min(1), name: z.string().min(1) }).safeParse(body)
+  if (!parsed.success) throw new Error('Create-project response did not match the dashboard schema')
+  return { ...parsed.data, documentCount: 0, ready: false }
+}
+
 // --- per-project uploaded documents (backend ingestion) ---
 
 const ProjectDocumentSchema = z.object({

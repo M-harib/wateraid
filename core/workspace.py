@@ -20,6 +20,14 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
+def _slug(name: str) -> str:
+    return re.sub(r"[^a-z0-9]+", "-", name.lower()).strip("-") or "project"
+
+
+def _humanize(pid: str) -> str:
+    return re.sub(r"[-_]+", " ", pid).strip().title() or pid
+
+
 @dataclass
 class DocMeta:
     doc_id: str
@@ -39,9 +47,11 @@ class ProjectCorpus:
 
     def __init__(self, project_id: str, root: Path) -> None:
         self.project_id = project_id
+        self.name = _humanize(project_id)
         self.root = root
         self.files_dir = root / "files"
         self.meta_path = root / "documents.json"
+        self.name_path = root / "project.json"
         self.units = UnitStore()
         self.findings = FindingStore()
         self.docs: dict[str, DocMeta] = {}
@@ -55,6 +65,11 @@ class ProjectCorpus:
         self.root.mkdir(parents=True, exist_ok=True)
         payload = json.dumps([m.to_dict() for m in self.docs.values()], indent=2)
         await asyncio.to_thread(self.meta_path.write_text, payload)
+
+    async def set_name(self, name: str) -> None:
+        self.name = name.strip() or self.name
+        self.root.mkdir(parents=True, exist_ok=True)
+        await asyncio.to_thread(self.name_path.write_text, json.dumps({"name": self.name}))
 
     async def add_file(self, filename: str, data: bytes) -> DocMeta:
         """Save an upload and register it as queued. Raises ValueError on bad type."""
@@ -118,6 +133,11 @@ class ProjectCorpus:
 
     async def load(self) -> None:
         """Restore docs from disk and re-ingest their files to rebuild units."""
+        if self.name_path.exists():
+            try:
+                self.name = json.loads(self.name_path.read_text()).get("name", self.name)
+            except (json.JSONDecodeError, OSError):
+                pass
         if not self.meta_path.exists():
             return
         try:
@@ -152,6 +172,19 @@ class Workspace:
                 self.projects[pid] = corpus
                 await corpus.load()
             return corpus
+
+    async def create(self, name: str) -> ProjectCorpus:
+        """Create (or fetch) a project from a human name, persisting the name."""
+        corpus = await self.project(_slug(name))
+        if name.strip() and corpus.name != name.strip():
+            await corpus.set_name(name)
+        return corpus
+
+    def list_projects(self) -> list[dict]:
+        return [
+            {"projectId": c.project_id, "name": c.name, "documentCount": len(c.docs), "ready": c.ready()}
+            for c in sorted(self.projects.values(), key=lambda c: c.name.lower())
+        ]
 
     async def load_all(self) -> None:
         if not self.data_dir.exists():

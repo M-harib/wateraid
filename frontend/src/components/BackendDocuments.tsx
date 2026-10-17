@@ -6,9 +6,17 @@ import {
   projectDocumentFileUrl,
   uploadProjectDocuments,
   type ProjectDocument,
+  type ProjectSummary,
 } from '../api'
 
-type Props = { projectId: string; projectName: string; connected: boolean }
+type Props = {
+  projectId: string
+  projectName: string
+  projects: ProjectSummary[]
+  onSelectProject: (id: string) => void
+  onNewProject: () => void
+  connected: boolean
+}
 
 const ACCEPT = '.pdf,.xlsx,.xls,.csv'
 
@@ -18,7 +26,7 @@ function StatusBadge({ doc }: { doc: ProjectDocument }) {
   return <span className="doc-badge busy"><Loader size={13} className="spin" /> {doc.status === 'queued' ? 'Queued' : 'Ingesting…'}</span>
 }
 
-export function BackendDocuments({ projectId, projectName, connected }: Props) {
+export function BackendDocuments({ projectId, projectName, projects, onSelectProject, onNewProject, connected }: Props) {
   const [docs, setDocs] = useState<ProjectDocument[]>([])
   const [uploading, setUploading] = useState(false)
   const [error, setError] = useState('')
@@ -63,7 +71,7 @@ export function BackendDocuments({ projectId, projectName, connected }: Props) {
   }
 
   return <div className="project-documents">
-    <div className="documents-heading"><div><span className="dashboard-eyebrow">PROJECT UPLOAD / {projectName.toUpperCase()}</span><h1>Upload documents</h1><p>Upload PDFs, spreadsheets, or CSVs. They are ingested in the background; once ready they are searchable from the evidence workspace.</p></div></div>
+    <div className="documents-heading"><div><span className="dashboard-eyebrow">PROJECT UPLOAD / {projectName.toUpperCase()}</span><h1>Upload documents</h1><p>Upload PDFs, spreadsheets, or CSVs to this project. They are ingested in the background; once ready they are searchable from the evidence workspace.</p></div><div className="workspace-project-select"><label htmlFor="upload-project">Project</label><select id="upload-project" value={projectId} onChange={(event) => { if (event.target.value === '__new__') onNewProject(); else onSelectProject(event.target.value) }}>{projects.map((item) => <option key={item.projectId} value={item.projectId}>{item.name} ({item.documentCount})</option>)}<option value="__new__">+ New project…</option></select></div></div>
     {!connected && <div className="inline-error" role="alert">Connect the analysis service (set VITE_API_BASE_URL) to upload documents.</div>}
     {(error || notice) && <div className={error ? 'inline-error' : 'draft-notice'} role={error ? 'alert' : 'status'}>{error || notice}</div>}
 
