@@ -5,10 +5,6 @@ import 'react-pdf/dist/Page/TextLayer.css'
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString()
 
-// Fetch the whole PDF in one plain GET. Cross-origin range requests need extra CORS
-// (exposed Content-Range) that browsers hide by default; a single GET sidesteps that.
-const DOC_OPTIONS = { disableStream: true, disableAutoFetch: true, disableRange: true }
-
 type Props = {
   title: string
   url: string
@@ -25,6 +21,8 @@ export function PdfPreview({ title, url, page, highlight }: Props) {
   const [width, setWidth] = useState(290)
   const [numPages, setNumPages] = useState<number>()
   const [zoom, setZoom] = useState(1)
+  const [blobUrl, setBlobUrl] = useState<string>()
+  const [loadError, setLoadError] = useState('')
   const scrolledRef = useRef('')
 
   useEffect(() => {
@@ -35,8 +33,21 @@ export function PdfPreview({ title, url, page, highlight }: Props) {
     return () => observer.disconnect()
   }, [])
 
-  useEffect(() => { setNumPages(undefined); setZoom(1) }, [url])
-  useEffect(() => { scrolledRef.current = '' }, [url, page, highlight])
+  // Fetch the file ourselves and hand react-pdf a same-origin blob URL. This avoids the
+  // cross-origin fetch/range/cache quirks (and the StrictMode load race) that leave the
+  // viewer stuck blank when react-pdf fetches a cross-origin URL directly.
+  useEffect(() => {
+    let active = true
+    let created: string | undefined
+    setBlobUrl(undefined); setLoadError(''); setNumPages(undefined); setZoom(1); scrolledRef.current = ''
+    fetch(url, { cache: 'no-store' })
+      .then((response) => { if (!response.ok) throw new Error(`The document service returned ${response.status}.`); return response.blob() })
+      .then((blob) => { if (!active) return; created = URL.createObjectURL(blob); setBlobUrl(created) })
+      .catch((error) => { if (active) setLoadError(error instanceof Error ? error.message : 'Could not load the PDF.') })
+    return () => { active = false; if (created) URL.revokeObjectURL(created) }
+  }, [url])
+
+  useEffect(() => { scrolledRef.current = '' }, [page, highlight])
 
   const target = highlight ? norm(highlight) : ''
   const scrollKey = `${page ?? ''}|${highlight ?? ''}`
@@ -68,27 +79,31 @@ export function PdfPreview({ title, url, page, highlight }: Props) {
   return (
     <div className="pdf-preview" ref={containerRef} aria-label={`${title} preview`}>
       <div className="pdf-page-scroll">
-        <Document
-          file={url}
-          options={DOC_OPTIONS}
-          onLoadSuccess={({ numPages: total }) => setNumPages(total)}
-          loading={<div className="pdf-message">Loading document…</div>}
-          error={<div className="pdf-message"><FileWarning size={22} /><span>Preview unavailable. Open the original PDF below.</span></div>}
-        >
-          {Array.from({ length: numPages ?? 0 }, (_, index) => (
-            <div className="pdf-page-wrap" id={`pdf-page-${index + 1}`} key={index + 1}>
-              <Page
-                pageNumber={index + 1}
-                width={Math.round(width * zoom)}
-                renderTextLayer
-                renderAnnotationLayer={false}
-                customTextRenderer={textRenderer}
-                onRenderTextLayerSuccess={anchorHighlight}
-                loading={<div className="pdf-message">Rendering page…</div>}
-              />
-            </div>
-          ))}
-        </Document>
+        {loadError
+          ? <div className="pdf-message"><FileWarning size={22} /><span>{loadError} Open the original PDF below.</span></div>
+          : !blobUrl
+            ? <div className="pdf-message">Loading document…</div>
+            : <Document
+                file={blobUrl}
+                onLoadSuccess={({ numPages: total }) => setNumPages(total)}
+                onLoadError={(error) => setLoadError(error.message)}
+                loading={<div className="pdf-message">Loading document…</div>}
+                error={<div className="pdf-message"><FileWarning size={22} /><span>Preview unavailable. Open the original PDF below.</span></div>}
+              >
+                {Array.from({ length: numPages ?? 0 }, (_, index) => (
+                  <div className="pdf-page-wrap" id={`pdf-page-${index + 1}`} key={index + 1}>
+                    <Page
+                      pageNumber={index + 1}
+                      width={Math.round(width * zoom)}
+                      renderTextLayer
+                      renderAnnotationLayer={false}
+                      customTextRenderer={textRenderer}
+                      onRenderTextLayerSuccess={anchorHighlight}
+                      loading={<div className="pdf-message">Rendering page…</div>}
+                    />
+                  </div>
+                ))}
+              </Document>}
       </div>
       <div className="pdf-pagination">
         <span>{numPages ? `${numPages} page${numPages === 1 ? '' : 's'}` : ''}</span>
