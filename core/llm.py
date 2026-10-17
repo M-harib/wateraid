@@ -4,13 +4,9 @@ from __future__ import annotations
 import asyncio
 import json
 import os
+import urllib.error
 import urllib.request
 from typing import Callable, Protocol, runtime_checkable
-
-DEFAULT_MODELS = {
-    "mini": os.getenv("LLM_MINI", "openai/gpt-4.1-mini"),
-    "strong": os.getenv("LLM_STRONG", "openai/gpt-4.1"),
-}
 
 
 @runtime_checkable
@@ -23,7 +19,10 @@ class OpenRouterLLM:
                  base_url: str = "https://openrouter.ai/api/v1/chat/completions",
                  max_tokens: int | None = None) -> None:
         self.api_key = api_key if api_key is not None else os.getenv("OPENROUTER_API_KEY")
-        self.models = models or DEFAULT_MODELS
+        self.models = models or {  # read at construction so .env (loaded at startup) applies
+            "mini": os.getenv("LLM_MINI", "openai/gpt-4.1-mini"),
+            "strong": os.getenv("LLM_STRONG", "openai/gpt-4.1"),
+        }
         self.base_url = base_url
         configured = ({
             "mini": int(os.getenv("LLM_MINI_MAX_TOKENS", "4096")),
@@ -53,8 +52,14 @@ class OpenRouterLLM:
             self.base_url, method="POST", data=json.dumps(payload).encode(),
             headers={"Authorization": f"Bearer {self.api_key}", "Content-Type": "application/json"},
         )
-        with urllib.request.urlopen(req, timeout=60) as resp:  # noqa: S310 (fixed OpenRouter URL)
-            data = json.load(resp)
+        try:
+            with urllib.request.urlopen(req, timeout=60) as resp:  # noqa: S310 (fixed OpenRouter URL)
+                data = json.load(resp)
+        except urllib.error.HTTPError as exc:
+            raise RuntimeError(f"LLM provider HTTP {exc.code}: "
+                               f"{exc.read().decode(errors='replace')[:300]}") from exc
+        except urllib.error.URLError as exc:
+            raise RuntimeError(f"LLM provider unreachable: {exc.reason}") from exc
         return data["choices"][0]["message"]["content"]
 
 

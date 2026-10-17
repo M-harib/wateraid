@@ -56,6 +56,7 @@ export function Dashboard({ section, onNavigate, onExit }: Props) {
   const [focus, setFocus] = useState<Focus>(null)
   const [selectedDocumentId, setSelectedDocumentId] = useState('03')
   const [selectedPage, setSelectedPage] = useState<number | undefined>()
+  const [selectedExcerpt, setSelectedExcerpt] = useState<string | undefined>()
   const [reviewFinding, setReviewFinding] = useState<Finding | null>(null)
   const [mobileNav, setMobileNav] = useState(false)
   const [search, setSearch] = useState('')
@@ -112,21 +113,22 @@ export function Dashboard({ section, onNavigate, onExit }: Props) {
     onNavigate(next)
   }
 
-  function openSource(id: string, page?: number) {
+  function openSource(id: string, page?: number, excerpt?: string) {
     setSelectedDocumentId(id)
     setSelectedPage(page)
+    setSelectedExcerpt(excerpt)
     setMobileNav(false)
     onNavigate('documents')
   }
 
   function openFinding(item: Finding) {
     setFocus({ kind: 'finding', id: item.id })
-    openSource(item.evidence[0].documentId, item.evidence[0].locator.page)
+    openSource(item.evidence[0].documentId, item.evidence[0].locator.page, item.evidence[0].excerpt)
   }
 
   function openRequirement(item: Requirement) {
     setFocus({ kind: 'requirement', id: item.id })
-    openSource(item.evidence[0].documentId, item.evidence[0].locator.page)
+    openSource(item.evidence[0].documentId, item.evidence[0].locator.page, item.evidence[0].excerpt)
   }
 
   function openInvestigation(item: Investigation) {
@@ -216,7 +218,7 @@ export function Dashboard({ section, onNavigate, onExit }: Props) {
           <SectionHeading eyebrow="Q&A / SHARED CORE" title="Ask the documents." subtitle="A question is answered only when the analysis service supplies a supported response." />
           <form className="ask-composer" onSubmit={submitQuestion}><label htmlFor="question-input">Your question</label><textarea id="question-input" value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="What does the agreement require for the final report?" rows={4} /><div><span>{connection.mode === 'connected' ? 'Responses are checked against the source pack.' : 'Connect the analysis service to receive an answer.'}</span><button className="solid-button" type="submit" disabled={!question.trim() || asking}>{asking ? 'Checking sources…' : 'Ask question'} <ArrowRight size={16} /></button></div></form>
           {askError && <div className="inline-error" role="alert">{askError}</div>}
-          {answer && <div className="answer-panel"><span className="dashboard-eyebrow">{answer.status?.replaceAll('_', ' ') ?? 'RESPONSE'} · REVIEW THE SOURCES</span><p>{answer.answer}</p>{answer.evidence.length ? <div className="answer-sources">{answer.evidence.map((item, index) => <button type="button" key={`${item.documentId}-${index}`} onClick={() => { setFocus(null); openSource(item.documentId, item.locator.page) }}>{documentById[item.documentId]?.shortTitle} · {evidenceLocation({ ...item, id: `${index}`, version: null, verified: false })}<ArrowUpRight size={15} /></button>)}</div> : <small>No source references were returned. Treat this as unverified.</small>}</div>}
+          {answer && <div className="answer-panel"><span className="dashboard-eyebrow">{answer.status?.replaceAll('_', ' ') ?? 'RESPONSE'} · REVIEW THE SOURCES</span><p>{answer.answer}</p>{answer.evidence.length ? <div className="answer-sources">{answer.evidence.map((item, index) => <button type="button" key={`${item.documentId}-${index}`} onClick={() => { setFocus(null); openSource(item.documentId, item.locator.page, item.excerpt) }}>{documentById[item.documentId]?.shortTitle} · {evidenceLocation({ ...item, id: `${index}`, version: null, verified: false })}<ArrowUpRight size={15} /></button>)}</div> : <small>No source references were returned. Treat this as unverified.</small>}</div>}
           <div className="ask-prompts"><span className="dashboard-eyebrow">FROM THE CHALLENGE GUIDE</span><h2>Questions to explore</h2><div>{investigations.map((item) => <button type="button" key={item.id} onClick={() => { setQuestion(item.question); setAnswer(null); setAskError('') }}><span>{String(item.questionNumber).padStart(2, '0')}</span><strong>{item.question}</strong><ChevronRight size={18} /></button>)}</div><p>These are guide prompts, not generated answers or compliance findings.</p></div>
         </>}
 
@@ -251,11 +253,11 @@ export function Dashboard({ section, onNavigate, onExit }: Props) {
         {section === 'documents' && <>
           <SectionHeading eyebrow="SOURCE LIBRARY / 00–06" title="Read the original." subtitle="The document is the center of this workspace. Citations open the relevant page or workbook reference." />
           <div className="source-workspace">
-            <div className="source-rail"><span className="source-rail-label">SOURCE FILES</span><label className="source-search"><Search size={16} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Find a document" aria-label="Find a document" /></label>{filteredDocuments.map((item) => { const Icon = item.format === 'PDF' ? FileText : FileSpreadsheet; return <button type="button" key={item.id} className={`source-rail-item ${document.id === item.id ? 'active' : ''}`} onClick={() => { setSelectedDocumentId(item.id); setSelectedPage(undefined); if (!focusedEvidence.some((evidence) => evidence.documentId === item.id) && !focusedInvestigation?.documentIds.includes(item.id)) setFocus(null) }}><span className="source-rail-icon"><Icon size={17} /></span><span><strong>{item.shortTitle}</strong><small>{item.id} · {item.format}</small></span></button> })}{filteredDocuments.length === 0 && <p className="no-results">No documents found.</p>}</div>
+            <div className="source-rail"><span className="source-rail-label">SOURCE FILES</span><label className="source-search"><Search size={16} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Find a document" aria-label="Find a document" /></label>{filteredDocuments.map((item) => { const Icon = item.format === 'PDF' ? FileText : FileSpreadsheet; return <button type="button" key={item.id} className={`source-rail-item ${document.id === item.id ? 'active' : ''}`} onClick={() => { setSelectedDocumentId(item.id); setSelectedPage(undefined); setSelectedExcerpt(undefined); if (!focusedEvidence.some((evidence) => evidence.documentId === item.id) && !focusedInvestigation?.documentIds.includes(item.id)) setFocus(null) }}><span className="source-rail-icon"><Icon size={17} /></span><span><strong>{item.shortTitle}</strong><small>{item.id} · {item.format}</small></span></button> })}{filteredDocuments.length === 0 && <p className="no-results">No documents found.</p>}</div>
             <div className="source-center">
-              {(focusedFinding || focusedRequirement || focusedInvestigation) && <div className="source-context"><span className="dashboard-eyebrow">{focusedFinding ? 'ISSUE UNDER REVIEW' : focusedRequirement ? 'EXTRACTED OBLIGATION' : `GUIDE QUESTION ${focusedInvestigation?.questionNumber}`}</span><h2>{focusedFinding?.title ?? focusedRequirement?.title ?? focusedInvestigation?.title}</h2><p>{focusedFinding?.summary ?? focusedRequirement?.statement ?? focusedInvestigation?.question}</p>{focusedFinding?.resolver && <p className="source-resolver"><strong>Suggested resolver:</strong> {focusedFinding.resolver}</p>}{focusedFinding && <button type="button" className="outline-button" onClick={() => setReviewFinding(focusedFinding)}>Record human review <ArrowRight size={16} /></button>}{focusedInvestigation && <small className="context-caveat">Investigation prompt from file 00; no finding has been generated.</small>}{focusedEvidence.length > 0 && <div className="source-evidence">{focusedEvidence.map((item) => <button type="button" key={item.id} className={document.id === item.documentId ? 'active' : ''} onClick={() => openSource(item.documentId, item.locator.page)}><span><strong>{documentById[item.documentId]?.shortTitle}</strong><small>{evidenceLocation(item)} · {item.verified ? 'Quote verified' : 'Needs verification'} · version {item.version ?? 'unknown'}</small></span><ChevronRight size={16} />{item.excerpt && <em>“{item.excerpt}”</em>}</button>)}</div>}</div>}
+              {(focusedFinding || focusedRequirement || focusedInvestigation) && <div className="source-context"><span className="dashboard-eyebrow">{focusedFinding ? 'ISSUE UNDER REVIEW' : focusedRequirement ? 'EXTRACTED OBLIGATION' : `GUIDE QUESTION ${focusedInvestigation?.questionNumber}`}</span><h2>{focusedFinding?.title ?? focusedRequirement?.title ?? focusedInvestigation?.title}</h2><p>{focusedFinding?.summary ?? focusedRequirement?.statement ?? focusedInvestigation?.question}</p>{focusedFinding?.resolver && <p className="source-resolver"><strong>Suggested resolver:</strong> {focusedFinding.resolver}</p>}{focusedFinding && <button type="button" className="outline-button" onClick={() => setReviewFinding(focusedFinding)}>Record human review <ArrowRight size={16} /></button>}{focusedInvestigation && <small className="context-caveat">Investigation prompt from file 00; no finding has been generated.</small>}{focusedEvidence.length > 0 && <div className="source-evidence">{focusedEvidence.map((item) => <button type="button" key={item.id} className={document.id === item.documentId ? 'active' : ''} onClick={() => openSource(item.documentId, item.locator.page, item.excerpt)}><span><strong>{documentById[item.documentId]?.shortTitle}</strong><small>{evidenceLocation(item)} · {item.verified ? 'Quote verified' : 'Needs verification'} · version {item.version ?? 'unknown'}</small></span><ChevronRight size={16} />{item.excerpt && <em>“{item.excerpt}”</em>}</button>)}</div>}</div>}
               <div className="source-document-head"><span><small>DOCUMENT {document.id} / {document.category.toUpperCase()}</small><strong>{document.title}</strong></span><a href={document.url} target="_blank" rel="noreferrer">{document.format === 'PDF' ? 'Open original' : 'Download workbook'} <ArrowUpRight size={16} /></a></div>
-              {document.format === 'PDF' ? <Suspense fallback={<div className="pdf-message">Preparing document…</div>}><PdfPreview title={document.title} url={document.url} page={selectedPage} onPageChange={setSelectedPage} /></Suspense> : <div className="workbook-panel"><FileSpreadsheet size={34} /><h3>Workbook source</h3><p>Open the original spreadsheet to inspect its sheet and cell values. Any cited sheet and range appear in the evidence above.</p><a className="solid-button" href={document.url} download>Download workbook <ArrowUpRight size={16} /></a></div>}
+              {document.format === 'PDF' ? <Suspense fallback={<div className="pdf-message">Preparing document…</div>}><PdfPreview title={document.title} url={document.url} page={selectedPage} highlight={selectedExcerpt} onPageChange={setSelectedPage} /></Suspense> : <div className="workbook-panel"><FileSpreadsheet size={34} /><h3>Workbook source</h3><p>Open the original spreadsheet to inspect its sheet and cell values. Any cited sheet and range appear in the evidence above.</p><a className="solid-button" href={document.url} download>Download workbook <ArrowUpRight size={16} /></a></div>}
             </div>
           </div>
         </>}

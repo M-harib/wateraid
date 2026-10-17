@@ -1,11 +1,5 @@
-"""HTTP API for the frontend. The only place the web framework lives."""
-from __future__ import annotations
+"""HTTP API for the frontend. The only place the web framework lives.
 
-
-def create_app(*args, **kwargs):
-    """Import lazily so ``python -m api.main`` does not execute the module twice."""
-    from .main import create_app as build
-    return build(*args, **kwargs)
-
-
-__all__ = ["create_app"]
+Import from the submodule directly (`from api.main import create_app`); __init__
+stays empty so `python -m api.main` doesn't pre-import api.main (runpy warning).
+"""

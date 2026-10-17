@@ -8,6 +8,7 @@ from __future__ import annotations
 import os
 from contextlib import asynccontextmanager
 
+from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
@@ -51,6 +52,7 @@ class ProposalAskRequest(BaseModel):
 def create_app(*, core: Core | None = None, llm=None) -> FastAPI:
     @asynccontextmanager
     async def lifespan(app: FastAPI):
+        load_dotenv()  # Load local .env for direct uvicorn/Makefile runs; shell values win.
         c = core or Core("assets")
         if not c.units.docs():                      # load once, in this event loop
             await c.load()
