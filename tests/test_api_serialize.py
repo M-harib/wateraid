@@ -109,3 +109,45 @@ def test_reviewer_mapping_uses_full_evidence_shape():
                                    "status": "mapped", "reason": "Section C addresses it."}])
     assert rows[0]["question"]["locator"] == {"sheet": "Review", "cells": "A2"}
     assert rows[0]["proposal"][0]["documentId"] == "02"
+
+
+# --- FE-contract guarantees (status/evidence can never break AnswerSchema) ---
+
+def test_answer_downgrades_to_not_found_when_no_usable_evidence():
+    # confirmed, but the only evidence has no locator -> dropped -> must not stay "answered"
+    f = _f(Status.confirmed, evidence=[_ev("03")])  # no page/section/sheet+cells
+    ans = finding_to_answer(f)
+    assert ans["evidence"] == [] and ans["status"] == "not_found"
+
+
+def test_answer_downgrades_conflict_with_one_evidence_to_needs_review():
+    f = _f(Status.conflict, evidence=[_ev("03", page=3)],
+           conflict=Conflict("q", Resolver.gac))
+    ans = finding_to_answer(f)
+    assert len(ans["evidence"]) == 1 and ans["status"] == "needs_review"
+
+
+def test_answer_keeps_conflict_with_two_evidence():
+    f = _f(Status.conflict, evidence=[_ev("03", page=3), _ev("04", page=8)],
+           conflict=Conflict("q", Resolver.gac))
+    ans = finding_to_answer(f)
+    assert ans["status"] == "conflict" and len(ans["evidence"]) == 2
+
+
+def test_answer_drops_evidence_without_locator():
+    f = _f(Status.confirmed, evidence=[_ev("03", page=3), _ev("04")])  # second has no locator
+    ans = finding_to_answer(f)
+    assert [e["documentId"] for e in ans["evidence"]] == ["03"]
+
+
+def test_issue_drops_evidence_without_locator():
+    f = _f(Status.conflict, topic="report_consistency",
+           evidence=[_ev("03", page=3), _ev("04")], conflict=Conflict("q", Resolver.gac))
+    issue = finding_to_issue(f)
+    assert all(e["locator"] for e in issue["evidence"]) and len(issue["evidence"]) == 1
+
+
+def test_evidence_full_verified_requires_excerpt():
+    # verified with no quote would break FE EvidenceSchema -> force verified False
+    d = evidence_full(_ev("03", page=3, quote="", verified=True))
+    assert d["verified"] is False and "excerpt" not in d

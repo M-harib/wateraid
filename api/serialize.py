@@ -25,6 +25,11 @@ def _locator(ref) -> dict:
     return loc
 
 
+def _valid_locator(ref) -> bool:
+    """The FE requires a page, a section, or sheet+cells on every evidence item."""
+    return ref.page is not None or bool(ref.section) or bool(ref.sheet and ref.cells)
+
+
 def _ev_id(ref) -> str:
     if ref.page is not None:
         return f"{ref.doc_id}:p{ref.page}"
@@ -35,8 +40,8 @@ def _ev_id(ref) -> str:
 
 def evidence_full(ev) -> dict:
     """Evidence for FindingSchema (id + version + verified)."""
-    d = {"id": _ev_id(ev.ref), "documentId": ev.ref.doc_id,
-         "version": ev.ref.version, "locator": _locator(ev.ref), "verified": ev.verified}
+    d = {"id": _ev_id(ev.ref), "documentId": ev.ref.doc_id, "version": ev.ref.version,
+         "locator": _locator(ev.ref), "verified": ev.verified and bool(ev.quote)}
     if ev.quote:  # omit (never null) — the frontend's excerpt is optional string
         d["excerpt"] = ev.quote
     return d
@@ -103,7 +108,8 @@ def finding_to_issue(f: Finding) -> dict:
         "owner": f.conflict.resolver.value if f.conflict else None,
         "resolver": f.conflict.resolver.value if f.conflict else None,
         "dueOn": f.due.isoformat() if f.due else None,
-        "evidence": [evidence_full(e) for e in f.evidence if e.ref.doc_id in PACK_DOCS],
+        "evidence": [evidence_full(e) for e in f.evidence
+                     if e.ref.doc_id in PACK_DOCS and _valid_locator(e.ref)],
     }
 
 
@@ -120,30 +126,35 @@ def issues_payload(findings: list[Finding]) -> list[dict]:
 
 
 def finding_to_answer(f: Finding) -> dict:
-    """A Finding -> frontend AnswerSchema for POST /ask."""
+    """Finding -> AnswerSchema; forces evidence/status to satisfy the FE contract."""
+    usable = [e for e in f.evidence if e.ref.doc_id in PACK_DOCS and _valid_locator(e.ref)]
+    evidence = [evidence_light(e) for e in usable]
     status = "answered" if f.status == Status.confirmed else f.status.value
-    evidence = [evidence_light(e) for e in f.evidence if e.ref.doc_id in PACK_DOCS]
-    verified = [e for e in f.evidence if e.ref.doc_id in PACK_DOCS and e.verified]
-    if not evidence or len(verified) != len(evidence):
+    if status == "answered" and not evidence:
+        status = "not_found"
+    elif status == "conflict" and len(evidence) < 2:
+        status = "needs_review"
+
+    if not evidence or any(not e.verified for e in usable):
         confidence = {"level": "low", "reason": "The answer has incomplete or unverified source support."}
-    elif f.status == Status.confirmed:
+    elif status == "answered":
         confidence = {"level": "high", "reason": "The answer is supported by verified quotations from the supplied documents."}
     else:
         confidence = {"level": "medium", "reason": "Verified sources were found, but they conflict or require human interpretation."}
 
     computed_result = f.computed.result if f.computed and isinstance(f.computed.result, dict) else {}
-    supplied_missing = computed_result.get("missing_information", [])
-    missing_information = [item for item in supplied_missing if isinstance(item, str) and item.strip()]
-    if f.status == Status.not_found and not missing_information:
+    missing_information = [item for item in computed_result.get("missing_information", [])
+                          if isinstance(item, str) and item.strip()]
+    if status == "not_found" and not missing_information:
         searched = ", ".join(f.searched) if f.searched else "the available sources"
         missing_information.append(f"The information needed to answer was not found in {searched}.")
-    elif f.status == Status.conflict and f.conflict:
+    elif status == "conflict" and f.conflict:
         missing_information.append(f.conflict.question)
-    elif f.status == Status.needs_review:
+    elif status == "needs_review":
         missing_information.append("The sources support only a qualified answer; human interpretation is still required.")
 
-    conflicting = evidence if f.status == Status.conflict else []
-    supporting = [] if f.status == Status.conflict else evidence
+    conflicting = evidence if status == "conflict" else []
+    supporting = [] if status == "conflict" else evidence
     return {
         "answer": f.claim or "No answer could be supported from the provided documents.",
         "status": status,
