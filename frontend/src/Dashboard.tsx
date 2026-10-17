@@ -30,6 +30,8 @@ const proposalPrompts = [
   { id: 'Q21', question: 'Which proposed or reported construction activities may conflict with the call?' },
   { id: 'Q23', question: 'Which claims in the proposal and results report lack supporting evidence in those documents?' },
 ]
+const proposalSourceDocuments = documents.filter((item) => item.id !== '00')
+const allProposalDocumentIds = proposalSourceDocuments.map((item) => item.id)
 
 const emptyProposalWorkspace: ProposalWorkspace = { findings: [], checklist: [], reviewerQuestions: [], failures: [] }
 
@@ -68,6 +70,7 @@ export function Dashboard({ section, onNavigate, onExit }: Props) {
   const [proposalLoading, setProposalLoading] = useState(false)
   const [proposalError, setProposalError] = useState('')
   const [proposalQuestion, setProposalQuestion] = useState(proposalPrompts[0].question)
+  const [proposalDocumentIds, setProposalDocumentIds] = useState<string[]>(allProposalDocumentIds)
   const [proposalAnswer, setProposalAnswer] = useState<AskAnswer | null>(null)
   const [proposalAsking, setProposalAsking] = useState(false)
 
@@ -170,7 +173,7 @@ export function Dashboard({ section, onNavigate, onExit }: Props) {
     if (connection.mode !== 'connected') { setProposalError('The analysis service is not connected.'); return }
     setProposalAsking(true)
     try {
-      setProposalAnswer(await askProposalQuestion(proposalQuestion.trim()))
+      setProposalAnswer(await askProposalQuestion(proposalQuestion.trim(), proposalDocumentIds))
       setProposal(await loadProposalWorkspace())
       setConnection(await loadDashboard())
     } catch (error) {
@@ -178,6 +181,14 @@ export function Dashboard({ section, onNavigate, onExit }: Props) {
     } finally {
       setProposalAsking(false)
     }
+  }
+
+  function toggleProposalDocument(documentId: string) {
+    setProposalDocumentIds((current) => current.includes(documentId)
+      ? current.length === 1 ? current : current.filter((id) => id !== documentId)
+      : allProposalDocumentIds.filter((id) => id === documentId || current.includes(id)))
+    setProposalAnswer(null)
+    setProposalError('')
   }
 
   function saveReview(decision: ReviewDecision, note: string, correctedValue?: string) {
@@ -223,8 +234,8 @@ export function Dashboard({ section, onNavigate, onExit }: Props) {
         {section === 'proposal' && <>
           <SectionHeading eyebrow="PRE-SUBMISSION REVIEW / PROPOSAL" title="Check the proposal against the call." subtitle="Run the three priority questions and the requirement checklist, then inspect every cited source." aside={<span className="heading-count">{proposal.checklist.length} checks</span>} />
           <div className="proposal-run-card"><div><span className="dashboard-eyebrow">PROPOSAL ASSISTANT</span><h2>{proposal.checklist.length ? 'Review results are ready.' : 'Run the source-backed review.'}</h2><p>The backend reads files 01–06, verifies quoted evidence, and uses code for cost-share and construction comparisons. A full run can take a few minutes.</p></div><button className="solid-button" type="button" onClick={runProposalReview} disabled={proposalLoading || connection.mode !== 'connected'}>{proposalLoading ? 'Checking documents…' : proposal.checklist.length ? 'Run again' : 'Run proposal checks'} <ArrowRight size={16} /></button></div>
-          <div className="proposal-prompts"><span className="dashboard-eyebrow">PRIORITY QUESTIONS</span>{proposalPrompts.map((item) => <button type="button" key={item.id} className={proposalQuestion === item.question ? 'active' : ''} onClick={() => { setProposalQuestion(item.question); setProposalAnswer(null); setProposalError('') }}><span>{item.id}</span><strong>{item.question}</strong></button>)}</div>
-          <form className="ask-composer proposal-composer" onSubmit={submitProposalQuestion}><label htmlFor="proposal-question">Ask the proposal assistant</label><textarea id="proposal-question" value={proposalQuestion} onChange={(event) => setProposalQuestion(event.target.value)} rows={3} /><div><span>Answers are limited to proposal-checking sources and verified excerpts.</span><button className="solid-button" type="submit" disabled={!proposalQuestion.trim() || proposalAsking || connection.mode !== 'connected'}>{proposalAsking ? 'Checking sources…' : 'Ask proposal'} <ArrowRight size={16} /></button></div></form>
+          <div className="proposal-prompts"><span className="dashboard-eyebrow">PRIORITY QUESTIONS</span>{proposalPrompts.map((item) => <button type="button" key={item.id} className={proposalQuestion === item.question ? 'active' : ''} onClick={() => { setProposalQuestion(item.question); setProposalDocumentIds(allProposalDocumentIds); setProposalAnswer(null); setProposalError('') }}><span>{item.id}</span><strong>{item.question}</strong></button>)}</div>
+          <form className="ask-composer proposal-composer" onSubmit={submitProposalQuestion}><label htmlFor="proposal-question">Ask anything about the proposal</label><textarea id="proposal-question" value={proposalQuestion} onChange={(event) => setProposalQuestion(event.target.value)} placeholder="Where will the project operate, and what activities are proposed there?" rows={3} /><fieldset className="proposal-source-picker"><legend>Search in</legend><div>{proposalSourceDocuments.map((item) => <button type="button" key={item.id} aria-pressed={proposalDocumentIds.includes(item.id)} className={proposalDocumentIds.includes(item.id) ? 'active' : ''} onClick={() => toggleProposalDocument(item.id)}><strong>{item.id}</strong>{item.shortTitle}</button>)}</div></fieldset><div><span>Every answer must include an exact, verified excerpt from the selected sources.</span><button className="solid-button" type="submit" disabled={!proposalQuestion.trim() || proposalDocumentIds.length === 0 || proposalAsking || connection.mode !== 'connected'}>{proposalAsking ? 'Checking sources…' : 'Ask proposal'} <ArrowRight size={16} /></button></div></form>
           {proposalError && <div className="inline-error" role="alert">{proposalError}</div>}
           {proposal.failures.map((failure, index) => <div className="clean-banner proposal-failure" key={`${failure}-${index}`}><CircleAlert size={20} /><div><strong>One check needs another run</strong><p>{failure}</p></div></div>)}
           {proposalAnswer && <div className="answer-panel"><span className="dashboard-eyebrow">{proposalAnswer.status.replaceAll('_', ' ')} · REVIEW THE SOURCES</span><p>{proposalAnswer.answer}</p>{proposalAnswer.evidence.length ? <div className="answer-sources">{proposalAnswer.evidence.map((item, index) => <button type="button" key={`${item.documentId}-${index}`} onClick={() => openSource(item.documentId, item.locator.page)}>{documentById[item.documentId]?.shortTitle} · {evidenceLocation({ ...item, id: `${index}`, version: null, verified: false })}<ArrowUpRight size={15} /></button>)}</div> : <small>No source references were returned. Treat this as unverified.</small>}</div>}

@@ -11,7 +11,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 from core import Core, OpenRouterLLM
 from tools.compliance import ComplianceAssistant
@@ -41,6 +41,11 @@ def _fixtures() -> bool:
 
 class AskRequest(BaseModel):
     question: str
+
+
+class ProposalAskRequest(BaseModel):
+    question: str
+    documentIds: list[str] | None = Field(default=None, min_length=1, max_length=6)
 
 
 def create_app(*, core: Core | None = None, llm=None) -> FastAPI:
@@ -95,11 +100,14 @@ def create_app(*, core: Core | None = None, llm=None) -> FastAPI:
         return proposal_payload(request.app.state.core.findings.all())
 
     @app.post("/proposal/ask")
-    async def proposal_ask(request: Request, body: AskRequest):
+    async def proposal_ask(request: Request, body: ProposalAskRequest):
         question = body.question.strip()
         if not question:
             return JSONResponse({"detail": "question is required"}, status_code=400)
-        finding = await request.app.state.proposal.finding(question)
+        try:
+            finding = await request.app.state.proposal.finding(question, body.documentIds)
+        except ValueError as exc:
+            return JSONResponse({"detail": str(exc)}, status_code=400)
         if finding.computed and finding.computed.result.get("error"):
             return JSONResponse({"detail": finding.claim}, status_code=503)
         return finding_to_answer(finding)

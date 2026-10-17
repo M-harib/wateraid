@@ -3,6 +3,8 @@
 Deliverable on `feat/proposal`: a checking-only view over the shared finding store,
 covering call/proposal requirements, contribution and construction conflicts,
 proposal/report claim grounding, PMF quality, and financial-reviewer preparation.
+Questions outside those specialized checks use a generic, citation-verified Q&A fallback
+over files 01–06, optionally restricted to caller-selected document IDs.
 Acceptance: both-document checklist evidence (or an explicit searched-proposal gap),
 verified quotations, deterministic numeric comparisons, named conflict resolvers,
 known-absent abstention, and passing synthetic unit tests and source-pack eval checks.
@@ -10,7 +12,7 @@ known-absent abstention, and passing synthetic unit tests and source-pack eval c
 The shared prerequisites already exist. This implementation imports `core.llm`,
 `core.dispatch`, `core.checks` and `core.pipeline` directly. `FakeLLM` is the supported
 test double; there is no second production pipeline or import of `tools.compliance`.
-No schema shapes, shared extraction modules, frontend files or API-owned files change.
+No core schema shapes change and the proposal tool does not import `tools.compliance`.
 
 ## Use from the API workstream
 
@@ -22,7 +24,8 @@ from tools.proposal import ProposalAssistant
 proposal = ProposalAssistant(core, OpenRouterLLM())
 await proposal.startup()  # warms the three priority intents, checklist and reviewer mapping
 
-await proposal.ask(question)        # Finding.to_dict(), canonical snake_case
+await proposal.ask(question)        # searches the default proposal corpus
+await proposal.ask(question, ["01", "02"])  # restrict generic Q&A to selected sources
 await proposal.checklist()          # one serialized row per extracted call requirement
 await proposal.reviewer_questions() # file 06 reviewer rows -> cited proposal sections
 await proposal.issues()             # proposal findings from the shared store
@@ -79,6 +82,9 @@ bounded to two concurrent calls with a 90-second timeout per request.
   cited; model-reconstructed spreadsheet text is never treated as a verbatim quote.
 - Only file 06's reviewer-question rows enter this tool. Example rows and cached
   budget formulas cannot become its evidence. ESDC reference forms are excluded.
+- Generic Q&A lexically ranks every allowed unit before sending a bounded context to
+  the model. Its `not_found` response means the retrieved pages did not support an
+  answer; it does not prove that wording is absent from an entire document.
 - The current shared gate retries `needs_review` even for legitimate qualitative
   uncertainty. The proposal adapter preserves a validated qualitative review draft
   on those requests instead of re-querying the model to manufacture certainty.

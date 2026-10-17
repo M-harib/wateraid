@@ -136,6 +136,29 @@ def relevant_units(units: list[Unit], query: str, *, per_doc: int | dict[str, in
     return [unit for index, unit in enumerate(units) if index in selected]
 
 
+def top_relevant_units(units: list[Unit], query: str, *, limit: int = 8) -> list[Unit]:
+    """Rank every supplied unit and return a stable, corpus-wide top-k selection."""
+    if isinstance(limit, bool) or not isinstance(limit, int) or limit <= 0:
+        raise ValueError("limit must be a positive integer")
+    if not units:
+        return []
+    query_counts = Counter(_search_tokens(query))
+    tokenized = [_search_tokens(unit.text) for unit in units]
+    document_frequency = Counter(token for tokens in tokenized for token in set(tokens))
+    total = len(units)
+
+    def score(index: int) -> float:
+        counts = Counter(tokenized[index])
+        return sum(
+            query_count * min(counts[token], 4) * (1.0 + math.log((total + 1) / (document_frequency[token] + 1)))
+            for token, query_count in query_counts.items()
+        )
+
+    ranked = sorted(range(total), key=lambda index: (-score(index), index))[:limit]
+    selected = set(ranked)
+    return [unit for index, unit in enumerate(units) if index in selected]
+
+
 def grounding_candidate_hints(units: list[Unit], limit_per_doc: int = 16) -> list[dict]:
     """Recall-oriented source spans for the model; these are candidates, never findings."""
     signals = re.compile(r"(?:\d+(?:\.\d+)?\s*%|\bpercent\b|\bsignificantly\b|\bimproved\b|"

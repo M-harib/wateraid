@@ -158,3 +158,27 @@ Verification after these changes:
 - `npm run build` - TypeScript and Vite passed; the existing PDF chunk-size warning remains.
 - The repository `.env` was normalized to assignment-only UTF-8 so `uv --env-file .env`
   parses it without warnings; it remains ignored and was not added to Git.
+
+### Proposal generic Q&A fallback - 2026-10-17
+
+Added a `generic_qa` fallback so unrecognized proposal questions no longer route to the
+unsupported-claims check. The fallback scans and ranks all permitted units from files
+01–06 (or caller-selected document IDs), sends a bounded set of relevant units to the
+model, verifies every returned quotation, and returns an explicit retrieved-page
+abstention when the evidence cannot support an answer. Known Q5/Q21/Q23 and PMF-quality
+intents retain their specialized deterministic paths.
+
+`POST /proposal/ask` now accepts optional camelCase `documentIds`. The proposal dashboard
+shows selectable source chips for files 01–06 and sends the selected scope with custom
+questions; priority-question buttons restore the full scope. No `core/schema.py` shapes
+changed. Synthetic tests cover generic routing, selected-source enforcement, verified
+answers and abstention.
+
+Verification:
+
+- `uv run pytest -q` - 155 passed with two upstream deprecation warnings.
+- `npm run build` - TypeScript and Vite passed; the existing PDF chunk-size warning remains.
+- Running API smoke check - `/healthz` passed, OpenAPI exposes `question,documentIds`, and
+  an unsupported selected document returned HTTP 400.
+- Live-model generic Q&A was not run because the configured OpenRouter account-level credit
+  pool was exhausted. The browser-control provider was unavailable for a visual UI pass.

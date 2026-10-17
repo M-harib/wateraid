@@ -117,7 +117,7 @@ export function runProposalChecks(): Promise<ProposalWorkspace> {
   return proposalRequest('/proposal/run', { method: 'POST' }, 360000)
 }
 
-export async function askProposalQuestion(question: string): Promise<AskAnswer> {
+export async function askProposalQuestion(question: string, documentIds?: string[]): Promise<AskAnswer> {
   const baseUrl = import.meta.env.VITE_API_BASE_URL?.trim().replace(/\/$/, '')
   if (!baseUrl) throw new Error('Connect the analysis service to ask a proposal question.')
   const controller = new AbortController()
@@ -126,7 +126,7 @@ export async function askProposalQuestion(question: string): Promise<AskAnswer> 
     const response = await fetch(`${baseUrl}/proposal/ask`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question }),
+      body: JSON.stringify({ question, ...(documentIds ? { documentIds } : {}) }),
       signal: controller.signal,
     })
     if (!response.ok) {

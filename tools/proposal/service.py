@@ -11,12 +11,12 @@ from core.checks import check_cost_share, score_urgency
 from core.checks.callmatch import Activity, CallRule, callmatch
 
 from .checklist import parse_row
-from .config import AS_OF, CHECKLIST_CATEGORIES, CONTEXT_UNITS_PER_DOC, STARTUP_QUESTIONS, dispatch
-from .evidence import InvalidOutput, array, cite, cite_whole_unit, cited_percentage, context, fingerprint, grounding_candidate_hints, object_value, parse, relevant_units, text, unit_id
+from .config import AS_OF, CHECKLIST_CATEGORIES, CONTEXT_UNITS_PER_DOC, PROPOSAL_SOURCE_DOCS, STARTUP_QUESTIONS, TABLE, dispatch
+from .evidence import InvalidOutput, array, cite, cite_whole_unit, cited_percentage, context, fingerprint, grounding_candidate_hints, object_value, parse, relevant_units, text, top_relevant_units, unit_id
 from .prompts import SYSTEM, TASKS
 from .quality import numeric_quality
 
-PROMPT_VERSION = "proposal-v4"
+PROMPT_VERSION = "proposal-v5"
 GROUNDING_CONTEXT_CHARS = 12_000
 
 
@@ -92,6 +92,8 @@ class ProposalAssistant:
         if topic in CONTEXT_UNITS_PER_DOC:
             retrieval_query = " ".join((question, topic.replace("_", " "), *self._intent_terms(topic)))
             units = relevant_units(units, retrieval_query, per_doc=CONTEXT_UNITS_PER_DOC[topic])
+        elif topic == "generic_qa":
+            units = top_relevant_units(units, question, limit=8)
         key = self._key(topic, units, question)
         async with self._locks.setdefault(key, asyncio.Lock()):
             cached = self.core.findings.by_key(key)
@@ -119,7 +121,7 @@ class ProposalAssistant:
                 try:
                     raw = await self._model(topic, question, units, at_tier,
                                             diagnostics[-1] if diagnostics else repair, extra)
-                    if "not_found" in raw:
+                    if "not_found" in raw and topic != "generic_qa":
                         # A model's absence assertion alone is not an accepted search result.
                         raise InvalidOutput("Insufficient evidence: " + text(raw["not_found"], "not_found"))
                     finding = builder(raw, lookup, key)
@@ -158,7 +160,7 @@ class ProposalAssistant:
         from .config import KEYWORDS
         return KEYWORDS.get(topic, ())
 
-    async def finding(self, question: str) -> Finding:
+    async def finding(self, question: str, document_ids: list[str] | tuple[str, ...] | None = None) -> Finding:
         question = text(question, "question")
         if len(question) > 4000:
             raise ValueError("Question exceeds 4000 characters")
@@ -177,7 +179,23 @@ class ProposalAssistant:
                     computed=Computed({"source": doc.doc_id}, {"absent_sources": [to_dict(doc)]}))
                 await self.core.findings.add(finding)
                 return finding
+        selected_docs: tuple[str, ...] | None = None
+        if document_ids is not None:
+            requested = set(document_ids)
+            invalid = requested - set(PROPOSAL_SOURCE_DOCS)
+            if invalid:
+                raise ValueError("Unsupported proposal document ID(s): " + ", ".join(sorted(invalid)))
+            selected_docs = tuple(doc for doc in PROPOSAL_SOURCE_DOCS if doc in requested)
+            if not selected_docs:
+                raise ValueError("Select at least one proposal source document")
         intent = dispatch(question)
+        if intent.name == "generic_qa":
+            docs = selected_docs or intent.docs
+        elif selected_docs is not None and not set(intent.docs).issubset(selected_docs):
+            intent = TABLE["generic_qa"]
+            docs = selected_docs
+        else:
+            docs = intent.docs
         extra = None
         if intent.name == "logic_model_quality":
             checks, _ = numeric_quality(self._units(intent.docs))
@@ -185,11 +203,37 @@ class ProposalAssistant:
         elif intent.name == "unsupported_claims":
             extra = {"candidate_hints": grounding_candidate_hints(self._units(intent.docs)),
                      "instruction": "Assess every hint; return unsupported candidates and any distinct candidates you identify."}
-        return await self._execute(intent.name, question, intent.docs, intent.tier,
+        return await self._execute(intent.name, question, docs, intent.tier,
                                    getattr(self, "_" + intent.name), extra=extra)
 
-    async def ask(self, question: str) -> dict:
-        return (await self.finding(question)).to_dict()
+    async def ask(self, question: str, document_ids: list[str] | tuple[str, ...] | None = None) -> dict:
+        return (await self.finding(question, document_ids)).to_dict()
+
+    def _generic_qa(self, raw: dict, units: dict[str, Unit], key: str) -> Finding:
+        searched_docs = sorted({unit.doc_id for unit in units.values()})
+        searched_units = sorted(units)
+        if raw.get("not_found"):
+            reason = text(raw.get("not_found"), "not_found")
+            return self._finding(
+                key, "generic_qa",
+                "Insufficient evidence in the retrieved source pages to answer this question. " + reason,
+                Status.not_found, searched=searched_docs,
+                computed=Computed({"retrieved_units": searched_units}, {"answer_supported": False}),
+            )
+        answer = text(raw.get("answer"), "answer")
+        answer_status = text(raw.get("answer_status"), "answer_status")
+        if answer_status not in {"answered", "needs_review"}:
+            raise InvalidOutput("answer_status must be answered or needs_review")
+        evidence = [cite(item, units, set(searched_docs))
+                    for item in array(raw.get("evidence"), "evidence")]
+        if not evidence:
+            raise InvalidOutput("A supported answer requires at least one source quotation")
+        return self._finding(
+            key, "generic_qa", answer,
+            Status.confirmed if answer_status == "answered" else Status.needs_review,
+            evidence=evidence, searched=searched_docs,
+            computed=Computed({"retrieved_units": searched_units}, {"answer_supported": True}),
+        )
 
     def _cost_share_vs_call(self, raw: dict, units: dict[str, Unit], key: str) -> Finding:
         agreement, call = cite(raw.get("agreement"), units, {"03"}), cite(raw.get("call"), units, {"01"})

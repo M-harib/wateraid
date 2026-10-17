@@ -10,7 +10,7 @@ from tools.proposal import ProposalAssistant
 from tools.proposal.checklist import parse_row
 
 from tools.proposal.config import CHECKLIST_CATEGORIES, TABLE, dispatch
-from tools.proposal.evidence import InvalidOutput, cite_whole_unit, cited_percentage, grounding_candidate_hints, relevant_units, unit_id
+from tools.proposal.evidence import InvalidOutput, cite_whole_unit, cited_percentage, grounding_candidate_hints, relevant_units, top_relevant_units, unit_id
 from tools.proposal.evidence import cite
 from tools.proposal.quality import numeric_quality
 
@@ -48,6 +48,14 @@ def test_relevant_units_accepts_document_specific_limits():
              unit("04", "construction", page=1), unit("04", "construction", page=2)]
     selected = relevant_units(units, "construction", per_doc={"01": 1, "04": 2})
     assert [unit_id(item) for item in selected] == ["01:p1", "04:p1", "04:p2"]
+
+
+def test_top_relevant_units_ranks_across_documents():
+    units = [unit("01", "General eligibility guidance."),
+             unit("02", "The delivery location is North District."),
+             unit("03", "General agreement terms.")]
+    selected = top_relevant_units(units, "Where is the delivery location?", limit=1)
+    assert [unit_id(item) for item in selected] == ["02:p1"]
 
 
 async def assistant(units, response):
@@ -148,7 +156,7 @@ async def test_construction_comparison_preserves_both_sources():
     units = [rule, proposal, unit("03", "Construction costs are described."), unit("04", "A new clinic was built.")]
     response = {"rules": [{"evidence": ev(rule), "new_construction_allowed": False}],
                 "activities": [{"evidence": ev(proposal), "kind": "new_construction"}], "context": []}
-    result = await (await assistant(units, response)).finding("construction")
+    result = await (await assistant(units, response)).finding("Does the construction conflict with the call?")
     assert result.status == Status.conflict
     assert result.conflict.resolver.value == "gac"
     assert result.computed.result["comparisons"][0]["conflict"]
@@ -233,7 +241,7 @@ async def test_success_cached_concurrent_requests_and_changed_question():
     tool = await assistant([a, b], responder)
     await asyncio.gather(tool.ask("cost share"), tool.ask("cost share"))
     assert len(calls) == 1
-    await tool.ask("Explain the cost share")
+    await tool.ask("Explain whether the cost share meets the call requirement")
     assert len(calls) == 2
     a.text = "Revised: Applicant minimum is 8%."
     await tool.ask("cost share")
@@ -245,6 +253,44 @@ async def test_known_absent_form_abstains_without_model():
     result = await tool.ask("Is the Local Partners form complete?")
     assert result["status"] == "not_found" and not result["evidence"]
     assert result["computed"]["result"]["absent_sources"][0]["doc_id"] == "LOCAL_PARTNERS"
+
+
+async def test_generic_question_answers_from_verified_selected_sources():
+    call = unit("01", "Applications must operate in the eligible country.")
+    proposal = unit("02", "The project will operate in North District.")
+
+    def response(tier, system, user):
+        payload = json.loads(user)
+        assert payload["task"] == "generic_qa"
+        assert {item["ref"]["doc_id"] for item in payload["source_units"]} == {"02"}
+        return json.dumps({"answer_status": "answered", "answer": "The project will operate in North District.",
+                           "evidence": [ev(proposal)]})
+
+    tool = await assistant([call, proposal], response)
+    result = await tool.finding("Where will the project operate?", ["02"])
+    assert result.status == Status.confirmed
+    assert result.evidence[0].verified and result.evidence[0].ref.doc_id == "02"
+
+
+async def test_generic_question_abstains_without_claiming_full_document_absence():
+    proposal = unit("02", "Section A describes the applicant.")
+    tool = await assistant([proposal], {"not_found": "The retrieved page does not support an answer.", "evidence": []})
+    result = await tool.finding("Who approves travel?", ["02"])
+    assert result.status == Status.not_found and result.searched == ["02"]
+    assert "retrieved source pages" in result.claim.lower()
+
+
+async def test_specialized_question_respects_narrower_selected_scope():
+    proposal = unit("02", "The proposal describes a contribution.")
+
+    def response(tier, system, user):
+        payload = json.loads(user)
+        assert payload["task"] == "generic_qa"
+        return json.dumps({"answer_status": "answered", "answer": "A contribution is described.",
+                           "evidence": [ev(proposal)]})
+
+    result = await (await assistant([proposal], response)).finding("Does the cost share meet the call?", ["02"])
+    assert result.topic == "generic_qa" and result.status == Status.confirmed
 
 
 async def test_no_model_returns_honest_unavailable_state():
@@ -291,6 +337,11 @@ def test_dispatch_has_expected_sources_and_tiers():
     assert TABLE["construction_vs_call"].docs == ("01", "02", "03", "04")
     assert TABLE["unsupported_claims"].tier == "strong"
     assert TABLE["logic_model_quality"].tier == "mini"
+    assert dispatch("Who manages project delivery?").name == "generic_qa"
+    assert dispatch("What construction activities are proposed?").name == "generic_qa"
+    assert dispatch("What is the indicator baseline?").name == "generic_qa"
+    assert dispatch("What cost share does the proposal offer?").name == "generic_qa"
+    assert dispatch("What claims does the proposal make?").name == "generic_qa"
 
 
 def test_exact_quote_with_wrong_page_is_relocated_uniquely():

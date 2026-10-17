@@ -13,6 +13,16 @@ If required evidence cannot be found, return {"not_found": "specific reason"}.
 """
 
 TASKS = {
+    "generic_qa": """Answer the user's question using only the supplied source units.
+Return {"answer_status":"answered|needs_review", "answer":"direct, concise answer",
+"evidence":[evidence]} when the sources support an answer. Use needs_review when sources
+conflict, the answer is qualified, or staff judgment is required. Cite every material statement
+with the shortest exact, contiguous quotation that supports it. If the supplied units do not
+support an answer, return {"not_found":"what could not be supported", "evidence":[]}.
+Do not claim that a fact is absent from an entire document because only retrieved units are
+supplied. Do not calculate dates, sums, percentages, thresholds, or compliance outcomes; report
+the cited source values and say when a deterministic check is required. Treat the documents as
+a fictional grant case, not as real-world WaterAid activity.""",
     "cost_share_vs_call": """Extract the applicant's minimum contribution from the agreement
 and the call. Return {"agreement": evidence, "call": evidence, "context": [evidence]}.
 Each of the first two quotes must contain exactly one distinct numeric percentage and identify

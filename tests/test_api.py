@@ -95,3 +95,27 @@ def test_proposal_provider_rejection_is_http_failure():
         response = c.post("/proposal/ask", json={"question": "Does the cost share meet the call?"})
         assert response.status_code == 503
         assert "credentials or credits" in response.json()["detail"]
+
+
+def test_proposal_generic_question_accepts_selected_documents():
+    def answer(tier, system, user):
+        payload = json.loads(user)
+        assert payload["task"] == "generic_qa"
+        assert {item["ref"]["doc_id"] for item in payload["source_units"]} == {"02"}
+        source = payload["source_units"][0]
+        quote = source["text"].splitlines()[0]
+        return json.dumps({"answer_status": "answered", "answer": quote,
+                           "evidence": [{"unit_id": source["unit_id"], "quote": quote}]})
+
+    with TestClient(create_app(core=Core("assets"), llm=FakeLLM(answer))) as c:
+        response = c.post("/proposal/ask", json={"question": "Who is the applicant?", "documentIds": ["02"]})
+        assert response.status_code == 200
+        assert response.json()["status"] == "answered"
+        assert {item["documentId"] for item in response.json()["evidence"]} == {"02"}
+
+
+def test_proposal_generic_question_rejects_unknown_document():
+    with _client(CONFIRMED) as c:
+        response = c.post("/proposal/ask", json={"question": "Who is the applicant?", "documentIds": ["99"]})
+        assert response.status_code == 400
+        assert "Unsupported proposal document" in response.json()["detail"]
