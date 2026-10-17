@@ -1,0 +1,33 @@
+[
+  {
+    "id": "Q12",
+    "question": "Which version of GAC's General Terms and Conditions applies to this agreement?",
+    "expect_status": "not_found",
+    "note": "Answerable only as: version in force on Effective Date 2019-06-21; GTC text not in pack."
+  },
+  {
+    "id": "Q5",
+    "question": "Does Water Care's minimum contribution meet the call's cost-share requirement?",
+    "expect_status": "conflict",
+    "expect_resolver": "gac",
+    "must_cite": ["03:p.2", "01:p.5"],
+    "expected_computed": {"meets_call": false, "gap": 0.5},
+    "note": "03 Article 2.2 requires 9.5% versus 01 physical page 5's 10%. Article 2.4 reiterates the call. Flag for GAC; do not resolve by precedence."
+  },
+  {
+    "id": "Q21",
+    "question": "Which parts of the proposal or project may not fit the call's rules on new construction?",
+    "expect_status": "conflict",
+    "expect_resolver": "gac",
+    "must_cite": ["01:p.5", "02:p.2", "04:p.6"],
+    "note": "01 prohibits new construction and allows limited refurbishment (25% footprint). 02 section E proposes a new latrine block; 04 section 6/output 1211 reports new four-stance blocks. 03 Appendix B 1.5.8 defines construction costs, but does not settle the call conflict."
+  },
+  {
+    "id": "Q23",
+    "question": "Which claims in the proposal or the Year 3 report have no supporting evidence?",
+    "expect_status": "needs_review",
+    "must_cite": ["02:p.3", "04:p.2"],
+    "expected_claim_fragments": ["miss up to 20% of school days", "attendance during menstruation has improved significantly"],
+    "note": "02 p.3's school-absence study claim names no study. 04 p.2's attendance improvement has no attendance indicator or measurement supplied in the report. Additional candidates include 02 p.6's disease reduction and 04 p.6's gender-policy attribution. Flag missing substantiation within searched 02/04, not proven falsehood."
+  }
+]

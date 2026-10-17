@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowDown, ArrowRight, ArrowUp, Check, FileText, FolderOpen, GripVertical, Plus, Printer, Sparkles, Trash2, Upload } from 'lucide-react'
-import { askQuestion, type AskAnswer } from '../api'
+import { askProposalQuestion, type AskAnswer } from '../api'
 import { type Finding, type Requirement } from '../domain'
 import { loadDraft, saveDraft, type Draft } from '../draft'
 import { documentById } from '../documents'
@@ -170,7 +170,7 @@ export function DraftWorkspace({ projectId, projectName, findings = [], requirem
     setBusy(true); setError(''); setAnswer(null); setAddedItems([]); setSelectedPhrase('')
     try {
       const prompt = `For the proposal section titled "${activeSection.heading}", ${question.trim()} Use only the supplied project source documents; say when evidence is insufficient. Current draft text: ${activeSection.body.slice(0, 1500)}`
-      const response = await askQuestion(prompt)
+      const response = await askProposalQuestion(prompt)
       setSuggestedForId(activeSection.id)
       setAnswer(response)
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'The analysis service is unavailable.') }

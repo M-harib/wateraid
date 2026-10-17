@@ -1,0 +1,32 @@
+[project]
+name = "grant-compliance-assistant"
+version = "0.1.0"
+description = "AI grant compliance assistant (Water Care A6) — funder-agnostic core shared by the compliance and proposal tools."
+requires-python = ">=3.13"
+dependencies = [
+    # Pinned and security-validated. Bump via `uv lock --upgrade-package <name>`.
+    "pypdf==6.20.0",
+    "openpyxl==3.1.5",
+    "fastapi==0.141.1",
+    "uvicorn==0.54.0",
+    "pydantic==2.13.5",
+    "starlette==1.6.0",
+    "python-dotenv==1.2.4",
+]
+
+[tool.uv]
+# Application, not a distributable library: manage a venv + deps, run with `uv run`.
+package = false
+
+[dependency-groups]
+dev = [
+    "httpx==0.28.1",
+    "pluggy==1.6.0",
+    "pytest==9.1.1",
+    "pytest-asyncio==1.4.0",
+]
+
+[tool.pytest.ini_options]
+pythonpath = ["."]
+asyncio_mode = "auto"
+testpaths = ["tests"]
