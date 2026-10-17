@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, ArrowRight, ArrowUpRight, BookOpenText, CalendarDays, CheckCircle2, ChevronRight, CircleAlert, ClipboardCheck, FileQuestion, FileSpreadsheet, FileText, FolderOpen, LayoutDashboard, Menu, MessageSquareText, PanelLeftClose, PanelLeftOpen, Search, ShieldCheck, X } from 'lucide-react'
 import { askProjectQuestion, askProposalQuestion, loadDashboard, loadProjectDocuments, loadProposalRunStatus, loadProposalWorkspace, projectDocumentFileUrl, runProposalChecks, type AskAnswer, type DashboardConnection, type ProjectDocument, type ProposalRunStatus } from './api'
 import { BrandMark } from './Brand'
@@ -8,13 +8,12 @@ import { ThemeToggle } from './components/ThemeToggle'
 import { DraftWorkspace } from './components/DraftWorkspace'
 import { ReportingCalendar } from './components/ReportingCalendar'
 import { BackendDocuments } from './components/BackendDocuments'
+import { PdfPreview } from './components/PdfPreview'
 import { documentById, documents } from './documents'
 import { evidenceLocation, type Finding, type ProposalWorkspace, type Requirement } from './domain'
 import { investigations, type Investigation } from './investigations'
 import { appendReview, evidenceFingerprint, latestReviewFor, loadReviews, type ReviewDecision, type ReviewRecord } from './reviews'
 import type { Theme } from './theme'
-
-const PdfPreview = lazy(() => import('./components/PdfPreview').then((module) => ({ default: module.PdfPreview })))
 
 export type DashboardSection = 'intake' | 'draft' | 'proposal' | 'overview' | 'issues' | 'obligations' | 'calendar' | 'documents' | 'reviews'
 type Focus = { kind: 'finding'; id: string } | { kind: 'requirement'; id: string } | { kind: 'investigation'; id: string } | null
@@ -360,7 +359,7 @@ export function Dashboard({ section, onNavigate, onExit, onProjects, theme, onTo
             <div className="source-center">
               {(focusedFinding || focusedRequirement || focusedInvestigation) && <div className="source-context"><span className="dashboard-eyebrow">{focusedFinding ? 'ISSUE UNDER REVIEW' : focusedRequirement ? 'EXTRACTED OBLIGATION' : `GUIDE QUESTION ${focusedInvestigation?.questionNumber}`}</span><h2>{focusedFinding?.title ?? focusedRequirement?.title ?? focusedInvestigation?.title}</h2><p>{focusedFinding?.summary ?? focusedRequirement?.statement ?? focusedInvestigation?.question}</p>{focusedFinding?.resolver && <p className="source-resolver"><strong>Who decides:</strong> {focusedFinding.resolver === 'gac' ? 'GAC' : focusedFinding.resolver === 'water_care_staff' ? 'Water Care staff' : focusedFinding.resolver}</p>}{focusedFinding && <button type="button" className="outline-button" onClick={() => setReviewFinding(focusedFinding)}>Record human review <ArrowRight size={16} /></button>}{focusedInvestigation && <small className="context-caveat">Investigation prompt from file 00; no finding has been generated.</small>}{focusedEvidence.length > 0 && <div className="source-evidence">{focusedEvidence.map((item, index) => <button type="button" key={`${item.id}-${index}`} className={document.id === item.documentId ? 'active' : ''} onClick={() => openSource(item.documentId, item.locator.page, item.excerpt)}><span><strong>{docById[item.documentId]?.shortTitle ?? item.documentId}</strong><small>{evidenceLocation(item)} · {item.verified ? 'Quote verified' : 'Needs verification'} · version {item.version ?? 'unknown'}</small></span><ChevronRight size={16} />{item.excerpt && <em>“{item.excerpt}”</em>}</button>)}</div>}</div>}
               <div className="source-document-head"><span><small>DOCUMENT {document.id} / {document.category.toUpperCase()}</small><strong>{document.title}</strong></span><a href={document.url} target="_blank" rel="noreferrer">{document.format === 'PDF' ? 'Open original' : 'Download workbook'} <ArrowUpRight size={16} /></a></div>
-              {document.format === 'PDF' ? <Suspense fallback={<div className="pdf-message">Preparing document…</div>}><PdfPreview title={document.title} url={document.url} page={selectedPage} highlight={selectedExcerpt} /></Suspense> : <div className="workbook-panel"><FileSpreadsheet size={34} /><h3>Workbook source</h3><p>Open the original spreadsheet to inspect its sheet and cell values. Any cited sheet and range appear in the evidence above.</p><a className="solid-button" href={document.url} download>Download workbook <ArrowUpRight size={16} /></a></div>}
+              {document.format === 'PDF' ? <PdfPreview title={document.title} url={document.url} page={selectedPage} highlight={selectedExcerpt} /> : <div className="workbook-panel"><FileSpreadsheet size={34} /><h3>Workbook source</h3><p>Open the original spreadsheet to inspect its sheet and cell values. Any cited sheet and range appear in the evidence above.</p><a className="solid-button" href={document.url} download>Download workbook <ArrowUpRight size={16} /></a></div>}
             </div>
             {assistantOpen && <AskPanel question={question} onQuestion={(value) => { setQuestion(value); setAnswer(null); setAskError('') }} onSubmit={submitQuestion} answer={answer} error={askError} asking={asking} connected={connection.mode === 'connected'} onClose={() => setAssistantOpen(false)} onCitation={openCitation} resolveName={(id) => docById[id]?.shortTitle} scope="Your uploaded documents" showGuide={false} />}
           </div>
