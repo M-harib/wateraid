@@ -13,7 +13,7 @@ export function LandingPage({ onEnter }: Props) {
     <header className="landing-header">
       <a className="landing-brand" href="#top" aria-label="GrantGuard home"><BrandMark light /><span>GrantGuard</span><small>ALPHA</small></a>
       <nav aria-label="Landing navigation"><a href="#how-it-works">How it works</a><a href="#workspace-preview">Workspace</a></nav>
-      <button className="landing-header-cta" type="button" onClick={onEnter}>Open workspace <ArrowUpRight size={16} /></button>
+      <button className="landing-header-cta" type="button" onClick={onEnter}>Explore projects <ArrowUpRight size={16} /></button>
     </header>
 
     <main id="top">
@@ -23,7 +23,7 @@ export function LandingPage({ onEnter }: Props) {
           <div className="hero-eyebrow"><span /> WATER CARE · TAPS FOR RIGHTS</div>
           <h1>Know what the<br /><em>grant requires.</em></h1>
           <p>Turn scattered agreement, report, and workbook details into questions your team can inspect and resolve—with the original source always close at hand.</p>
-          <button className="hero-cta" type="button" onClick={onEnter}>Explore the workspace <ArrowRight size={19} /></button>
+          <button className="hero-cta" type="button" onClick={onEnter}>Explore projects <ArrowRight size={19} /></button>
           <span className="hero-note">Synthetic Water Care case · 30 June 2022 scenario</span>
         </div>
       </section>
@@ -34,7 +34,7 @@ export function LandingPage({ onEnter }: Props) {
           <div className="preview-window">
             <div className="preview-window-top"><span><BrandMark /> GrantGuard</span><span className="preview-window-dots"><i /><i /><i /></span></div>
             <div className="preview-window-body">
-              <div className="preview-mini-nav"><strong>Workspace</strong><span className="active">Overview</span><span>Ask the documents</span><span>Issues</span><span>Obligations</span><span>Source library</span></div>
+              <div className="preview-mini-nav"><strong>Project workspace</strong><span className="active">Overview</span><span>Evidence workspace</span><span>Issues</span><span>Obligations</span><span>Review history</span></div>
               <div className="preview-mini-main"><small>EVIDENCE WORKSPACE / TAPS FOR RIGHTS</small><h3>What needs attention?</h3><p>Ask a question, trace the source, and record a decision.</p><div className="preview-mini-prompt"><FileSearch2 size={19} /><span>When is the final report due?</span><ArrowRight size={17} /></div><div className="preview-mini-cards"><div><span>01 / ASK</span><strong>Start with the question.</strong><small>Use the source pack to investigate.</small></div><div><span>02 / INSPECT</span><strong>Read the cited page.</strong><small>See the original document in context.</small></div></div></div>
               <div className="preview-mini-source"><div className="preview-mini-paper"><span>CONTRIBUTION AGREEMENT</span><i /><i /><i /><i /><i /><b /></div><small>Original source · page view</small></div>
             </div>

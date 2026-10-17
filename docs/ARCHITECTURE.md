@@ -25,7 +25,11 @@ This is a proposed design, not an implemented system. Adjust it after inspecting
 
 ## Current frontend boundary
 
-`frontend/` is a React/Vite/TypeScript app. Its landing page leads into a dashboard with separate Q&A, issues, obligations, calendar, source library, and review views. The source library opens the original PDF in the main content area. The build plan proposes a shared finding store and `POST /ask`, `GET /findings`, `GET /obligations`, and `GET /calendar` APIs. The frontend currently uses provisional, validated view models in `frontend/src/api.ts` and `frontend/src/domain.ts`; map the eventual `backend/core/schema.py` responses into them or replace them with generated types when the backend contract exists. No frontend component calls a model.
+`frontend/` is a React/Vite/TypeScript app. The landing page opens a project hub. The Taps for Rights demo is the only project with source documents and analysis routes; its project workspace has overview, issues, obligations, calendar, evidence workspace, and review views. The evidence workspace keeps the original PDF in the center and opens Q&A in an optional right panel. Answer citations switch the central document and page. Original files remain read-only; human review records are separate.
+
+Additional project shells have UUIDs and local browser storage for name and organization only. They open an empty project setup view and never call the demo API or display demo findings. The canonical demo path is `/projects/taps-for-rights`; legacy `/dashboard` paths still open the demo. Authentication, uploads, shared project storage, and project-scoped backend routes are future integration work, not implemented behavior. When those services arrive, scope every document, finding, answer, and review by a server-owned project ID and enforce user access on the server before enabling analysis for other projects.
+
+The build plan proposes a shared finding store and `POST /ask`, `GET /findings`, `GET /obligations`, and `GET /calendar` APIs. The frontend currently uses provisional, validated view models in `frontend/src/api.ts` and `frontend/src/domain.ts`; map the eventual `backend/core/schema.py` responses into them or replace them with generated types when the backend contract exists. No frontend component calls a model.
 
 ## Model use and cost
 
