@@ -82,6 +82,8 @@ def create_app(*, core: Core | None = None, llm=None) -> FastAPI:
     app.add_middleware(
         CORSMiddleware, allow_origins=_origins(),
         allow_methods=["GET", "POST", "DELETE"], allow_headers=["*"],
+        # pdf.js uses range requests; cross-origin it must read these to size/stream the PDF
+        expose_headers=["Content-Range", "Accept-Ranges", "Content-Length"],
     )
 
     @app.get("/healthz")

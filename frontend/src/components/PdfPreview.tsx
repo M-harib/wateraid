@@ -5,6 +5,10 @@ import 'react-pdf/dist/Page/TextLayer.css'
 
 pdfjs.GlobalWorkerOptions.workerSrc = new URL('pdfjs-dist/build/pdf.worker.min.mjs', import.meta.url).toString()
 
+// Fetch the whole PDF in one plain GET. Cross-origin range requests need extra CORS
+// (exposed Content-Range) that browsers hide by default; a single GET sidesteps that.
+const DOC_OPTIONS = { disableStream: true, disableAutoFetch: true, disableRange: true }
+
 type Props = {
   title: string
   url: string
@@ -51,6 +55,7 @@ export function PdfPreview({ title, url, page, highlight, onPageChange }: Props)
       <div className="pdf-page-scroll">
         <Document
           file={url}
+          options={DOC_OPTIONS}
           onLoadSuccess={({ numPages: total }) => setNumPages(total)}
           loading={<div className="pdf-message">Loading source page…</div>}
           error={<div className="pdf-message"><FileWarning size={22} /><span>Preview unavailable. Open the original PDF below.</span></div>}

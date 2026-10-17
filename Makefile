@@ -24,13 +24,13 @@ install:
 
 up:
 	@mkdir -p "$(RUN)"
-	if lsof -ti:$(BE_PORT) >/dev/null 2>&1; then
+	if lsof -ti:$(BE_PORT) -sTCP:LISTEN >/dev/null 2>&1; then
 	  echo "backend already running on :$(BE_PORT)"
 	else
 	  setsid uv run uvicorn api.main:app --host 127.0.0.1 --port $(BE_PORT) >"$(RUN)/be.log" 2>&1 </dev/null &
 	  echo "backend  -> http://localhost:$(BE_PORT)  (log: .run/be.log)"
 	fi
-	if lsof -ti:$(FE_PORT) >/dev/null 2>&1; then
+	if lsof -ti:$(FE_PORT) -sTCP:LISTEN >/dev/null 2>&1; then
 	  echo "frontend already running on :$(FE_PORT)"
 	else
 	  ( cd "$(CURDIR)/frontend" && setsid npm run dev >"$(RUN)/fe.log" 2>&1 </dev/null & )
@@ -38,8 +38,8 @@ up:
 	fi
 
 down:
-	@lsof -ti:$(BE_PORT) 2>/dev/null | xargs -r kill 2>/dev/null && echo "stopped backend (:$(BE_PORT))" || echo "backend not running"
-	lsof -ti:$(FE_PORT) 2>/dev/null | xargs -r kill 2>/dev/null && echo "stopped frontend (:$(FE_PORT))" || echo "frontend not running"
+	@lsof -ti:$(BE_PORT) -sTCP:LISTEN 2>/dev/null | xargs -r kill 2>/dev/null && echo "stopped backend (:$(BE_PORT))" || echo "backend not running"
+	lsof -ti:$(FE_PORT) -sTCP:LISTEN 2>/dev/null | xargs -r kill 2>/dev/null && echo "stopped frontend (:$(FE_PORT))" || echo "frontend not running"
 
 restart:
 	@$(MAKE) down
@@ -53,8 +53,8 @@ fe:
 	cd frontend && npm run dev
 
 status:
-	@lsof -ti:$(BE_PORT) >/dev/null 2>&1 && echo "backend  UP   (:$(BE_PORT))" || echo "backend  DOWN (:$(BE_PORT))"
-	lsof -ti:$(FE_PORT) >/dev/null 2>&1 && echo "frontend UP   (:$(FE_PORT))" || echo "frontend DOWN (:$(FE_PORT))"
+	@lsof -ti:$(BE_PORT) -sTCP:LISTEN >/dev/null 2>&1 && echo "backend  UP   (:$(BE_PORT))" || echo "backend  DOWN (:$(BE_PORT))"
+	lsof -ti:$(FE_PORT) -sTCP:LISTEN >/dev/null 2>&1 && echo "frontend UP   (:$(FE_PORT))" || echo "frontend DOWN (:$(FE_PORT))"
 
 logs:
 	@touch "$(RUN)/be.log" "$(RUN)/fe.log"
