@@ -77,6 +77,16 @@ def test_proposal_workspace_starts_empty_without_running_models():
         assert body == {"findings": [], "checklist": [], "reviewerQuestions": [], "failures": []}
 
 
+def test_proposal_run_starts_in_background_and_exposes_status():
+    with _client(CONFIRMED) as c:
+        initial = c.get("/proposal/run/status").json()
+        assert initial["status"] == "idle" and initial["total"] == 5
+        response = c.post("/proposal/run")
+        assert response.status_code == 202
+        assert response.json()["status"] in {"running", "completed"}
+        assert c.get("/proposal/run/status").status_code == 200
+
+
 def test_proposal_ask_abstains_for_known_absent_form():
     with _client(CONFIRMED) as c:
         response = c.post("/proposal/ask", json={"question": "Is the Local Partners form complete?"})

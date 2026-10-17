@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import asyncio
+import inspect
 import json
+from collections.abc import Awaitable, Callable
 from dataclasses import asdict
 from urllib.error import HTTPError
 
@@ -255,7 +257,8 @@ class ProposalAssistant:
                 key, "generic_qa",
                 "Insufficient evidence in the retrieved source pages to answer this question. " + reason,
                 Status.not_found, searched=searched_docs,
-                computed=Computed({"retrieved_units": searched_units}, {"answer_supported": False}),
+                computed=Computed({"retrieved_units": searched_units},
+                                  {"answer_supported": False, "missing_information": [reason]}),
             )
         answer = text(raw.get("answer"), "answer")
         answer_status = text(raw.get("answer_status"), "answer_status")
@@ -459,10 +462,15 @@ class ProposalAssistant:
         finding = await self._execute("reviewer_mapping", "Map reviewer questions to proposal sections.", ("02", "06"), "mini", build)
         return finding.computed.result.get("rows", []) if finding.computed else []
 
-    async def startup(self) -> dict:
+    async def startup(self, on_progress: Callable[[str, str], Awaitable[None] | None] | None = None) -> dict:
         """Invoke after shared ingest in the app's async lifespan; safe to call repeatedly."""
-        findings = []
-        for topic in STARTUP_TOPICS:
+        async def notify(step: str, status: str) -> None:
+            if on_progress:
+                result = on_progress(step, status)
+                if inspect.isawaitable(result):
+                    await result
+
+        async def run_topic(topic: str) -> dict:
             intent = TABLE[topic]
             extra = None
             if topic == "unsupported_claims":
@@ -470,10 +478,30 @@ class ProposalAssistant:
                          "instruction": "Assess every hint; return unsupported candidates and any distinct candidates you identify."}
             finding = await self._execute(topic, "Run the configured pre-submission review.",
                                           intent.docs, intent.tier, getattr(self, "_" + topic), extra=extra)
-            findings.append(finding.to_dict())
-        checklist = await self.checklist()
-        reviewer = await self.reviewer_questions()
-        return {"findings": findings, "checklist": checklist, "reviewer_questions": reviewer}
+            return finding.to_dict()
+
+        calls: dict[str, Callable[[], Awaitable[object]]] = {
+            **{topic: (lambda topic=topic: run_topic(topic)) for topic in STARTUP_TOPICS},
+            "checklist": self.checklist,
+            "reviewer_mapping": self.reviewer_questions,
+        }
+
+        async def run_step(step: str, call: Callable[[], Awaitable[object]]) -> tuple[str, object]:
+            await notify(step, "running")
+            try:
+                result = await call()
+            except Exception:
+                await notify(step, "failed")
+                raise
+            await notify(step, "completed")
+            return step, result
+
+        completed = dict(await asyncio.gather(*(run_step(step, call) for step, call in calls.items())))
+        return {
+            "findings": [completed[topic] for topic in STARTUP_TOPICS],
+            "checklist": completed["checklist"],
+            "reviewer_questions": completed["reviewer_mapping"],
+        }
 
     async def issues(self) -> list[dict]:
         return [f.to_dict() for f in self.core.findings.all() if f.tool == "proposal"]

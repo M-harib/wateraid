@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, ArrowRight, ArrowUpRight, BookOpenText, CalendarDays, CheckCircle2, ChevronRight, CircleAlert, ClipboardCheck, FileQuestion, FileSpreadsheet, FileText, FolderOpen, LayoutDashboard, Menu, MessageSquareText, Search, ShieldCheck, X } from 'lucide-react'
-import { askProposalQuestion, askQuestion, loadDashboard, loadProposalWorkspace, runProposalChecks, type AskAnswer, type DashboardConnection } from './api'
+import { askProposalQuestion, askQuestion, loadDashboard, loadProposalRunStatus, loadProposalWorkspace, runProposalChecks, type AskAnswer, type DashboardConnection, type ProposalRunStatus } from './api'
 import { BrandMark } from './Brand'
 import { ReviewDialog } from './components/ReviewDialog'
 import { documentById, documents } from './documents'
@@ -32,6 +32,7 @@ const proposalPrompts = [
 ]
 
 const emptyProposalWorkspace: ProposalWorkspace = { findings: [], checklist: [], reviewerQuestions: [], failures: [] }
+const emptyProposalRun: ProposalRunStatus = { runId: null, status: 'idle', completed: 0, total: 5, percent: 0, steps: [], startedAt: null, finishedAt: null, error: null }
 
 function formatDate(value: string) {
   const parsed = new Date(`${value.slice(0, 10)}T12:00:00Z`)
@@ -50,6 +51,20 @@ function EmptyState({ icon: Icon, title, description, action }: { icon: typeof F
   return <div className="clean-empty"><span className="clean-empty-icon"><Icon size={25} /></span><h2>{title}</h2><p>{description}</p>{action}</div>
 }
 
+function AnswerPanel({ answer, openEvidence }: { answer: AskAnswer; openEvidence: (evidence: AskAnswer['evidence'][number]) => void }) {
+  const supporting = answer.supportingEvidence.length ? answer.supportingEvidence : answer.status === 'conflict' ? [] : answer.evidence
+  const conflicting = answer.conflictingEvidence.length ? answer.conflictingEvidence : answer.status === 'conflict' ? answer.evidence : []
+  const evidenceGroup = (label: string, evidence: typeof answer.evidence, conflict = false) => evidence.length > 0 && <section className={`answer-evidence-group ${conflict ? 'conflicting' : ''}`}><h4>{label}</h4><div>{evidence.map((item, index) => <button type="button" key={`${item.documentId}-${index}-${label}`} onClick={() => openEvidence(item)}><span><strong>{documentById[item.documentId]?.shortTitle}</strong><small>{evidenceLocation({ ...item, id: `${index}`, version: null, verified: true })}</small></span><ArrowUpRight size={15} />{item.excerpt && <em>“{item.excerpt}”</em>}</button>)}</div></section>
+  return <div className="answer-panel answer-detail">
+    <div className="answer-heading"><span className="dashboard-eyebrow">{answer.status.replaceAll('_', ' ')} · REVIEW THE SOURCES</span><span className={`confidence-badge confidence-${answer.confidence.level}`}>{answer.confidence.level} evidence confidence</span></div>
+    <section className="answer-direct"><h4>Direct answer</h4><p>{answer.answer}</p><small>{answer.confidence.reason}</small></section>
+    {evidenceGroup('Supporting evidence', supporting)}
+    {evidenceGroup('Conflicting evidence', conflicting, true)}
+    {answer.missingInformation.length > 0 && <section className="answer-missing"><h4>Missing information</h4><ul>{answer.missingInformation.map((item, index) => <li key={`${item}-${index}`}>{item}</li>)}</ul></section>}
+    <section className="answer-next"><span>SUGGESTED NEXT ACTION · RECOMMENDATION</span><p>{answer.suggestedNextAction}</p></section>
+  </div>
+}
+
 export function Dashboard({ section, onNavigate, onExit }: Props) {
   const [connection, setConnection] = useState<DashboardConnection>({ mode: 'preview', data: { projectName: 'Taps for Rights', asOf: '2022-06-30', findings: [], requirements: [] } })
   const [reviews, setReviews] = useState<ReviewRecord[]>(loadReviews)
@@ -66,6 +81,7 @@ export function Dashboard({ section, onNavigate, onExit }: Props) {
   const [asking, setAsking] = useState(false)
   const [notice, setNotice] = useState('')
   const [proposal, setProposal] = useState<ProposalWorkspace>(emptyProposalWorkspace)
+  const [proposalRun, setProposalRun] = useState<ProposalRunStatus>(emptyProposalRun)
   const [proposalLoading, setProposalLoading] = useState(false)
   const [proposalError, setProposalError] = useState('')
   const [proposalQuestion, setProposalQuestion] = useState(proposalPrompts[0].question)
@@ -81,11 +97,38 @@ export function Dashboard({ section, onNavigate, onExit }: Props) {
   useEffect(() => {
     if (connection.mode !== 'connected') return
     let active = true
-    loadProposalWorkspace()
-      .then((result) => { if (active) setProposal(result) })
+    Promise.all([loadProposalWorkspace(), loadProposalRunStatus()])
+      .then(([workspace, run]) => { if (active) { setProposal(workspace); setProposalRun(run); setProposalLoading(run.status === 'running') } })
       .catch((error) => { if (active) setProposalError(error instanceof Error ? error.message : 'Could not load proposal checks.') })
     return () => { active = false }
   }, [connection.mode])
+
+  useEffect(() => {
+    if (proposalRun.status !== 'running' || connection.mode !== 'connected') return
+    let active = true
+    let timer: number | undefined
+    const poll = async () => {
+      try {
+        const [run, workspace] = await Promise.all([loadProposalRunStatus(), loadProposalWorkspace()])
+        if (!active) return
+        setProposalRun(run)
+        setProposal(workspace)
+        if (run.status === 'running') timer = window.setTimeout(poll, 800)
+        else if (run.status === 'completed') {
+          setProposalLoading(false)
+          setConnection(await loadDashboard())
+          setNotice('Proposal review complete')
+        } else if (run.status === 'failed') {
+          setProposalLoading(false)
+          setProposalError(run.error ?? 'The proposal review could not finish.')
+        }
+      } catch (error) {
+        if (active) { setProposalLoading(false); setProposalError(error instanceof Error ? error.message : 'Could not read proposal progress.') }
+      }
+    }
+    timer = window.setTimeout(poll, 300)
+    return () => { active = false; if (timer) window.clearTimeout(timer) }
+  }, [proposalRun.status, connection.mode])
 
   useEffect(() => {
     if (!notice) return
@@ -153,13 +196,19 @@ export function Dashboard({ section, onNavigate, onExit }: Props) {
     setProposalLoading(true)
     setProposalError('')
     try {
-      const result = await runProposalChecks()
-      setProposal(result)
-      setConnection(await loadDashboard())
-      setNotice('Proposal review complete')
+      const run = await runProposalChecks()
+      setProposalRun(run)
+      if (run.status === 'completed') {
+        setProposal(await loadProposalWorkspace())
+        setConnection(await loadDashboard())
+        setProposalLoading(false)
+        setNotice('Proposal review complete')
+      } else if (run.status === 'failed') {
+        setProposalLoading(false)
+        setProposalError(run.error ?? 'The proposal review could not finish.')
+      }
     } catch (error) {
       setProposalError(error instanceof Error ? error.message : 'The proposal review could not finish.')
-    } finally {
       setProposalLoading(false)
     }
   }
@@ -218,18 +267,18 @@ export function Dashboard({ section, onNavigate, onExit }: Props) {
           <SectionHeading eyebrow="Q&A / SHARED CORE" title="Ask the documents." subtitle="A question is answered only when the analysis service supplies a supported response." />
           <form className="ask-composer" onSubmit={submitQuestion}><label htmlFor="question-input">Your question</label><textarea id="question-input" value={question} onChange={(event) => setQuestion(event.target.value)} placeholder="What does the agreement require for the final report?" rows={4} /><div><span>{connection.mode === 'connected' ? 'Responses are checked against the source pack.' : 'Connect the analysis service to receive an answer.'}</span><button className="solid-button" type="submit" disabled={!question.trim() || asking}>{asking ? 'Checking sources…' : 'Ask question'} <ArrowRight size={16} /></button></div></form>
           {askError && <div className="inline-error" role="alert">{askError}</div>}
-          {answer && <div className="answer-panel"><span className="dashboard-eyebrow">{answer.status?.replaceAll('_', ' ') ?? 'RESPONSE'} · REVIEW THE SOURCES</span><p>{answer.answer}</p>{answer.evidence.length ? <div className="answer-sources">{answer.evidence.map((item, index) => <button type="button" key={`${item.documentId}-${index}`} onClick={() => { setFocus(null); openSource(item.documentId, item.locator.page, item.excerpt) }}>{documentById[item.documentId]?.shortTitle} · {evidenceLocation({ ...item, id: `${index}`, version: null, verified: false })}<ArrowUpRight size={15} /></button>)}</div> : <small>No source references were returned. Treat this as unverified.</small>}</div>}
+          {answer && <AnswerPanel answer={answer} openEvidence={(item) => { setFocus(null); openSource(item.documentId, item.locator.page, item.excerpt) }} />}
           <div className="ask-prompts"><span className="dashboard-eyebrow">FROM THE CHALLENGE GUIDE</span><h2>Questions to explore</h2><div>{investigations.map((item) => <button type="button" key={item.id} onClick={() => { setQuestion(item.question); setAnswer(null); setAskError('') }}><span>{String(item.questionNumber).padStart(2, '0')}</span><strong>{item.question}</strong><ChevronRight size={18} /></button>)}</div><p>These are guide prompts, not generated answers or compliance findings.</p></div>
         </>}
 
         {section === 'proposal' && <>
           <SectionHeading eyebrow="PRE-SUBMISSION REVIEW / PROPOSAL" title="Check the proposal against the call." subtitle="Ask any proposal question, or run the structured review and inspect every cited source." aside={<span className="heading-count">{proposal.checklist.length} checks</span>} />
-          <div className="proposal-run-card"><div><span className="dashboard-eyebrow">PROPOSAL ASSISTANT</span><h2>{proposal.checklist.length ? 'Review results are ready.' : 'Run the source-backed review.'}</h2><p>The backend reads files 01–06, verifies quoted evidence, and uses code for cost-share and construction comparisons. A full run can take a few minutes.</p></div><button className="solid-button" type="button" onClick={runProposalReview} disabled={proposalLoading || connection.mode !== 'connected'}>{proposalLoading ? 'Checking documents…' : proposal.checklist.length ? 'Run again' : 'Run proposal checks'} <ArrowRight size={16} /></button></div>
+          <div className="proposal-run-card"><div><span className="dashboard-eyebrow">PROPOSAL ASSISTANT</span><h2>{proposalLoading ? `Review ${proposalRun.percent}% complete.` : proposal.checklist.length ? 'Review results are ready.' : 'Run the source-backed review.'}</h2><p>The backend reads files 01–06, verifies quoted evidence, and uses code for cost-share and construction comparisons. You can keep using the dashboard while the review runs.</p>{proposalLoading && <div className="proposal-progress"><div><span>{proposalRun.completed} of {proposalRun.total} review steps finished</span><strong>{proposalRun.percent}%</strong></div><div className="proposal-progress-track" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={proposalRun.percent}><span style={{ width: `${proposalRun.percent}%` }} /></div><ul>{proposalRun.steps.map((step) => <li key={step.id} className={`step-${step.status}`}><span />{step.label}<small>{step.status}</small></li>)}</ul></div>}</div><button className="solid-button" type="button" onClick={runProposalReview} disabled={proposalLoading || connection.mode !== 'connected'}>{proposalLoading ? 'Review running' : proposal.checklist.length ? 'Run again' : 'Run proposal checks'} <ArrowRight size={16} /></button></div>
           <div className="proposal-prompts"><span className="dashboard-eyebrow">SAMPLE QUESTIONS</span>{proposalPrompts.map((item) => <button type="button" key={item.id} className={proposalQuestion === item.question ? 'active' : ''} onClick={() => { setProposalQuestion(item.question); setProposalAnswer(null); setProposalError('') }}><span>{item.id}</span><strong>{item.question}</strong></button>)}</div>
           <form className="ask-composer proposal-composer" onSubmit={submitProposalQuestion}><label htmlFor="proposal-question">Ask anything about the proposal</label><textarea id="proposal-question" value={proposalQuestion} onChange={(event) => setProposalQuestion(event.target.value)} placeholder="Where will the project operate, and what activities are proposed there?" rows={3} /><p className="proposal-scope-note">Automatically searches the call, proposal, agreement, report, PMF, and reviewer questions. <button type="button" onClick={() => { setQuestion(proposalQuestion); navigate('ask') }}>Use Ask the documents for questions outside the proposal review.</button></p><div><span>Every answer must include an exact, verified excerpt from the proposal sources.</span><button className="solid-button" type="submit" disabled={!proposalQuestion.trim() || proposalAsking || connection.mode !== 'connected'}>{proposalAsking ? 'Checking sources…' : 'Ask proposal'} <ArrowRight size={16} /></button></div></form>
           {proposalError && <div className="inline-error" role="alert">{proposalError}</div>}
           {proposal.failures.map((failure, index) => <div className="clean-banner proposal-failure" key={`${failure}-${index}`}><CircleAlert size={20} /><div><strong>One check needs another run</strong><p>{failure}</p></div></div>)}
-          {proposalAnswer && <div className="answer-panel"><span className="dashboard-eyebrow">{proposalAnswer.status.replaceAll('_', ' ')} · REVIEW THE SOURCES</span><p>{proposalAnswer.answer}</p>{proposalAnswer.evidence.length ? <div className="answer-sources">{proposalAnswer.evidence.map((item, index) => <button type="button" key={`${item.documentId}-${index}`} onClick={() => openSource(item.documentId, item.locator.page)}>{documentById[item.documentId]?.shortTitle} · {evidenceLocation({ ...item, id: `${index}`, version: null, verified: false })}<ArrowUpRight size={15} /></button>)}</div> : <small>No source references were returned. Treat this as unverified.</small>}</div>}
+          {proposalAnswer && <AnswerPanel answer={proposalAnswer} openEvidence={(item) => openSource(item.documentId, item.locator.page, item.excerpt)} />}
           {proposal.findings.length > 0 && <section className="proposal-section"><div className="proposal-section-head"><div><span className="dashboard-eyebrow">PRIORITY FINDINGS</span><h2>What needs human review</h2></div><span>{proposal.findings.length} findings</span></div><div className="clean-list">{proposal.findings.map((item) => <button type="button" key={item.id} onClick={() => openSource(item.evidence[0].documentId, item.evidence[0].locator.page)}><span className="list-icon"><CircleAlert size={19} /></span><span className="list-copy"><small>{item.kind.replaceAll('_', ' ')} · {item.evidence.length} cited sources</small><strong>{item.title}</strong><span>{item.summary}</span></span><span className="row-status">{item.priority}</span><ChevronRight size={18} /></button>)}</div></section>}
           <section className="proposal-section"><div className="proposal-section-head"><div><span className="dashboard-eyebrow">CALL REQUIREMENTS</span><h2>Checklist against proposal 02</h2></div>{proposal.checklist.length > 0 && <span>{proposal.checklist.filter((row) => row.status === 'met').length} met</span>}</div>{proposal.checklist.length ? <div className="proposal-checklist">{proposal.checklist.map((row) => <article key={row.id}><div><span className={`proposal-status status-${row.status}`}>{row.status.replaceAll('_', ' ')}</span><small>{row.category.replaceAll('_', ' ')}</small></div><h3>{row.requirement}</h3><p>{row.reason}</p>{row.absentSources.length > 0 && <small className="proposal-absent">Not in pack: {row.absentSources.join(', ')}</small>}<div className="proposal-evidence">{row.evidence.map((item, index) => <button type="button" key={`${item.id}-${index}`} onClick={() => openSource(item.documentId, item.locator.page)}><strong>{item.documentId}</strong><span>{evidenceLocation(item)}</span><ArrowUpRight size={14} /></button>)}</div></article>)}</div> : <EmptyState icon={ClipboardCheck} title="No proposal checks run yet" description="Start the review to compare the nine call-requirement categories with the preliminary proposal." />}</section>
           {proposal.reviewerQuestions.length > 0 && <section className="proposal-section"><div className="proposal-section-head"><div><span className="dashboard-eyebrow">GAC REVIEW PREP</span><h2>Reviewer questions mapped</h2></div><span>{proposal.reviewerQuestions.length} questions</span></div><div className="reviewer-map">{proposal.reviewerQuestions.map((row, index) => <article key={`${row.question.id}-${index}`}><span className={`proposal-status status-${row.status}`}>{row.status.replaceAll('_', ' ')}</span><p>“{row.question.excerpt}”</p><small>{row.reason}</small><div className="proposal-evidence"><button type="button" onClick={() => openSource(row.question.documentId, row.question.locator.page)}><strong>06</strong><span>{evidenceLocation(row.question)}</span><ArrowUpRight size={14} /></button>{row.proposal.map((item, proposalIndex) => <button type="button" key={`${item.id}-${proposalIndex}`} onClick={() => openSource(item.documentId, item.locator.page)}><strong>02</strong><span>{evidenceLocation(item)}</span><ArrowUpRight size={14} /></button>)}</div></article>)}</div></section>}

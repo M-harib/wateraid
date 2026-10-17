@@ -211,3 +211,32 @@ Verification:
 
 A fresh live-model answer-quality run still requires restoring the exhausted OpenRouter
 account balance.
+
+### Structured answers and asynchronous proposal review - 2026-10-17
+
+Expanded the API answer view without changing `core/schema.py`. Both document and proposal
+answers now expose a direct answer, evidence-confidence level and reason, separate supporting
+and conflicting evidence, missing information, and a suggested next action. The dashboard
+renders the recommendation in its own labelled block so it cannot be mistaken for a document
+fact. Existing `answer`, `status`, and `evidence` fields remain for compatibility.
+
+Changed the full proposal review into a tracked background job. `POST /proposal/run` returns
+HTTP 202 immediately, and `GET /proposal/run/status` reports five step states plus completed
+count and percentage. The three focused checks, checklist, and reviewer mapping run
+concurrently within the shared model semaphore. Duplicate start requests reuse the active
+run, the dashboard polls every 800 ms, partial stored views remain readable, and lifespan
+shutdown cancels an unfinished task cleanly.
+
+Verification:
+
+- `uv run pytest -q` - 165 passed with two upstream deprecation warnings.
+- `npm run build` - TypeScript and Vite passed; the existing PDF chunk-size warning remains.
+- A live background start returned in 114 ms and visibly advanced 0%, 20%, 40%, 60%, 80%,
+  then 100% over about 71 seconds. The dashboard stayed usable during the run.
+- The live run returned nine reviewer mappings and surfaced two invalid model extractions as
+  named retryable failures; it did not silently accept them.
+- A live open-ended partner question returned an accurate direct answer with high evidence
+  confidence and two verified proposal citations, with conflicts, gaps, and the recommendation
+  serialized separately.
+- A 1440 px Edge headless render verified the in-progress step list, progress bar, partial
+  findings, composer, and responsive card layout.

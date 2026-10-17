@@ -32,7 +32,7 @@ Copy `frontend/.env.example` to `frontend/.env.local` before starting Vite. Open
 
 ## Backend connection
 
-Copy `.env.example` to `.env.local` and set `VITE_API_BASE_URL` to the FastAPI origin. The frontend requests the build plan's `GET /findings`, `GET /obligations`, and `POST /ask` routes. Proposal review uses `GET /proposal`, `POST /proposal/ask`, and `POST /proposal/run`. Calendar entries are derived from the due dates on cited obligations; `GET /calendar` can replace that projection when its canonical response is ready. Configure CORS for the Vite origin during local development. The frontend currently accepts an array or a `{ "findings": [...] }` wrapper for findings, and an array or `{ "obligations": [...] }` for obligations. A compatible finding view model is:
+Copy `.env.example` to `.env.local` and set `VITE_API_BASE_URL` to the FastAPI origin. The frontend requests the build plan's `GET /findings`, `GET /obligations`, and `POST /ask` routes. Proposal review uses `GET /proposal`, `POST /proposal/ask`, `POST /proposal/run`, and polls `GET /proposal/run/status` while the background review runs. Answers separate their direct response, evidence confidence, supporting and conflicting evidence, missing information, and recommended next action. Calendar entries are derived from the due dates on cited obligations; `GET /calendar` can replace that projection when its canonical response is ready. Configure CORS for the Vite origin during local development. The frontend currently accepts an array or a `{ "findings": [...] }` wrapper for findings, and an array or `{ "obligations": [...] }` for obligations. A compatible finding view model is:
 
 ```json
 {
