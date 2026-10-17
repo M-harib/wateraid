@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, ArrowRight, ArrowUpRight, BookOpenText, CalendarDays, CheckCircle2, ChevronRight, CircleAlert, ClipboardCheck, FileQuestion, FileSpreadsheet, FileText, FolderOpen, LayoutDashboard, Menu, MessageSquareText, PanelLeftClose, PanelLeftOpen, Search, ShieldCheck, X } from 'lucide-react'
-import { askProjectQuestion, askProposalQuestion, askQuestion, loadDashboard, loadProjectDocuments, loadProposalRunStatus, loadProposalWorkspace, projectDocumentFileUrl, runProposalChecks, type AskAnswer, type DashboardConnection, type ProjectDocument, type ProposalRunStatus } from './api'
+import { askProjectQuestion, askProposalQuestion, loadDashboard, loadProjectDocuments, loadProposalRunStatus, loadProposalWorkspace, projectDocumentFileUrl, runProposalChecks, type AskAnswer, type DashboardConnection, type ProjectDocument, type ProposalRunStatus } from './api'
 import { BrandMark } from './Brand'
 import { ReviewDialog } from './components/ReviewDialog'
 import { AskPanel } from './components/AskPanel'
@@ -174,17 +174,16 @@ export function Dashboard({ section, onNavigate, onExit, onProjects, theme, onTo
   const requirements = connection.data.requirements
   const readyUploads = useMemo(() => uploadedDocs.filter((d) => d.status === 'ready'), [uploadedDocs])
   const uploadedAsDocs = useMemo(() => readyUploads.map((d) => ({ id: d.doc_id, shortTitle: d.filename, title: d.filename, category: 'Uploaded', format: (d.kind === 'pdf' ? 'PDF' : 'XLSX') as 'PDF' | 'XLSX', url: projectDocumentFileUrl('taps-for-rights', d.doc_id) })), [readyUploads])
-  const allDocuments = useMemo(() => [...documents, ...uploadedAsDocs], [uploadedAsDocs])
-  const docById = useMemo<Record<string, (typeof allDocuments)[number]>>(() => Object.fromEntries(allDocuments.map((d) => [d.id, d])), [allDocuments])
-  const hasUploads = readyUploads.length > 0
-  const document = docById[selectedDocumentId] ?? allDocuments[0]
+  // workspace lists only uploaded docs; docById also keeps bundled docs so finding citations still resolve in the preview
+  const docById = useMemo(() => Object.fromEntries([...documents, ...uploadedAsDocs].map((d) => [d.id, d])) as Record<string, { id: string; shortTitle: string; title: string; category: string; format: 'PDF' | 'XLSX'; url: string }>, [uploadedAsDocs])
+  const document = docById[selectedDocumentId] ?? uploadedAsDocs[0] ?? documents[0]
   const focusedFinding = focus?.kind === 'finding' ? [...findings, ...proposal.findings].find((item) => item.id === focus.id) : undefined
   const focusedRequirement = focus?.kind === 'requirement' ? requirements.find((item) => item.id === focus.id) : undefined
   const focusedInvestigation = focus?.kind === 'investigation' ? investigations.find((item) => item.id === focus.id) : undefined
   const focusedEvidence = focusedFinding?.evidence ?? focusedRequirement?.evidence ?? []
   const dates = useMemo(() => requirements.filter((item) => item.dueOn).sort((a, b) => (a.dueOn ?? '').localeCompare(b.dueOn ?? '')), [requirements])
   const currentReviewCount = findings.filter((item) => { const review = latestReviewFor(item.id, reviews); return review?.fingerprint === evidenceFingerprint(item) }).length
-  const filteredDocuments = allDocuments.filter((item) => `${item.title} ${item.category}`.toLowerCase().includes(search.toLowerCase()))
+  const filteredDocuments = uploadedAsDocs.filter((item) => `${item.title} ${item.category}`.toLowerCase().includes(search.toLowerCase()))
   const filteredFindings = findings.filter((item) => `${item.title} ${item.summary}`.toLowerCase().includes(search.toLowerCase()))
   const filteredRequirements = requirements.filter((item) => `${item.title} ${item.statement}`.toLowerCase().includes(search.toLowerCase()))
 
@@ -243,7 +242,7 @@ export function Dashboard({ section, onNavigate, onExit, onProjects, theme, onTo
     setAskError('')
     if (connection.mode !== 'connected') { setAskError('The analysis service is not connected yet. You can inspect the source files below.'); return }
     setAsking(true)
-    try { setAnswer(await (hasUploads ? askProjectQuestion('taps-for-rights', question.trim()) : askQuestion(question.trim()))) }
+    try { setAnswer(await askProjectQuestion('taps-for-rights', question.trim())) }
     catch (error) { setAskError(error instanceof Error ? error.message : 'The question service is unavailable.') }
     finally { setAsking(false) }
   }
@@ -353,8 +352,8 @@ export function Dashboard({ section, onNavigate, onExit, onProjects, theme, onTo
         </>}
 
         {section === 'documents' && <>
-          <SectionHeading eyebrow="EVIDENCE WORKSPACE / TAPS FOR RIGHTS" title="Read, ask, and review." subtitle="Open a source in the center. Ask questions alongside it and follow citations back to the original." />
-          <div className="workspace-toolbar"><div><label htmlFor="workspace-document">Document</label><select id="workspace-document" value={document.id} onChange={(event) => { setSelectedDocumentId(event.target.value); setSelectedPage(undefined); setSelectedExcerpt(undefined); setFocus(null) }}>{allDocuments.map((item) => <option key={item.id} value={item.id}>{item.shortTitle}</option>)}</select></div><button type="button" className={`workspace-assistant-toggle ${assistantOpen ? 'active' : ''}`} onClick={() => setAssistantOpen(!assistantOpen)} aria-expanded={assistantOpen}><MessageSquareText size={17} /> {assistantOpen ? 'Close assistant' : 'Ask the documents'}</button></div>
+          <SectionHeading eyebrow="EVIDENCE WORKSPACE / UPLOADED DOCUMENTS" title="Read, ask, and review." subtitle="Open one of your uploaded sources in the center. Ask questions alongside it and follow citations back to the original." />
+          <div className="workspace-toolbar"><div><label htmlFor="workspace-document">Document</label><select id="workspace-document" value={document.id} onChange={(event) => { setSelectedDocumentId(event.target.value); setSelectedPage(undefined); setSelectedExcerpt(undefined); setFocus(null) }}>{uploadedAsDocs.map((item) => <option key={item.id} value={item.id}>{item.shortTitle}</option>)}</select></div><button type="button" className={`workspace-assistant-toggle ${assistantOpen ? 'active' : ''}`} onClick={() => setAssistantOpen(!assistantOpen)} aria-expanded={assistantOpen}><MessageSquareText size={17} /> {assistantOpen ? 'Close assistant' : 'Ask the documents'}</button></div>
           {assistantOpen && <button className="assistant-mobile-cover" type="button" onClick={() => setAssistantOpen(false)} aria-label="Close assistant" />}
           <div className={`source-workspace ${assistantOpen ? 'with-assistant' : ''}`}>
             {!assistantOpen && <div className="source-rail"><span className="source-rail-label">SOURCE FILES</span><label className="source-search"><Search size={16} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Find a document" aria-label="Find a document" /></label>{filteredDocuments.map((item) => { const Icon = item.format === 'PDF' ? FileText : FileSpreadsheet; return <button type="button" key={item.id} className={`source-rail-item ${document.id === item.id ? 'active' : ''}`} onClick={() => { setSelectedDocumentId(item.id); setSelectedPage(undefined); setSelectedExcerpt(undefined); if (!focusedEvidence.some((evidence) => evidence.documentId === item.id) && !focusedInvestigation?.documentIds.includes(item.id)) setFocus(null) }}><span className="source-rail-icon"><Icon size={17} /></span><span><strong>{item.shortTitle}</strong><small>{item.id} · {item.format}</small></span></button> })}{filteredDocuments.length === 0 && <p className="no-results">No documents found.</p>}</div>}
@@ -363,7 +362,7 @@ export function Dashboard({ section, onNavigate, onExit, onProjects, theme, onTo
               <div className="source-document-head"><span><small>DOCUMENT {document.id} / {document.category.toUpperCase()}</small><strong>{document.title}</strong></span><a href={document.url} target="_blank" rel="noreferrer">{document.format === 'PDF' ? 'Open original' : 'Download workbook'} <ArrowUpRight size={16} /></a></div>
               {document.format === 'PDF' ? <Suspense fallback={<div className="pdf-message">Preparing document…</div>}><PdfPreview title={document.title} url={document.url} page={selectedPage} highlight={selectedExcerpt} onPageChange={setSelectedPage} /></Suspense> : <div className="workbook-panel"><FileSpreadsheet size={34} /><h3>Workbook source</h3><p>Open the original spreadsheet to inspect its sheet and cell values. Any cited sheet and range appear in the evidence above.</p><a className="solid-button" href={document.url} download>Download workbook <ArrowUpRight size={16} /></a></div>}
             </div>
-            {assistantOpen && <AskPanel question={question} onQuestion={(value) => { setQuestion(value); setAnswer(null); setAskError('') }} onSubmit={submitQuestion} answer={answer} error={askError} asking={asking} connected={connection.mode === 'connected'} onClose={() => setAssistantOpen(false)} onCitation={openCitation} resolveName={(id) => docById[id]?.shortTitle} scope={hasUploads ? 'Your uploaded documents' : 'All Taps for Rights sources'} showGuide={!hasUploads} />}
+            {assistantOpen && <AskPanel question={question} onQuestion={(value) => { setQuestion(value); setAnswer(null); setAskError('') }} onSubmit={submitQuestion} answer={answer} error={askError} asking={asking} connected={connection.mode === 'connected'} onClose={() => setAssistantOpen(false)} onCitation={openCitation} resolveName={(id) => docById[id]?.shortTitle} scope="Your uploaded documents" showGuide={false} />}
           </div>
         </>}
 
