@@ -96,3 +96,36 @@ Open integration/risk notes:
   without printing it. Never commit `.env`.
 - Reviewer should inspect qualitative grounding precision, completeness of mandatory
   checklist rows, construction classifications, and the proposal/API mapping before merge.
+
+### Proposal frontend integration - 2026-10-17
+
+Rebased `feat/proposal` onto current `main` and merged the published `feat/api` branch,
+then mounted the proposal assistant without changing `core/schema.py`. Added cached
+proposal workspace, ask, run, checklist, and reviewer-mapping endpoints; the API boundary
+maps proposal evidence and checklist rows to the frontend's camelCase Zod models.
+
+Added `/dashboard/proposal` with Q5/Q21/Q23 shortcuts, an explicit full-run action,
+priority findings, all nine checklist categories, reviewer-question mappings, operational
+failure messages, and citation buttons into the existing source viewer. The local Vite
+configuration points to port 8010; CORS accepts localhost and loopback Vite origins on
+ports 5173 and 5174.
+
+Commands actually run:
+
+- `uv sync --locked` - installed the merged FastAPI dependencies.
+- `uv run pytest -q tests/test_api.py tests/test_api_serialize.py tests/test_proposal.py tests/eval/test_proposal_pack.py` - 67 passed, with two upstream deprecation warnings.
+- `uv run pytest -q` - 138 passed, with the same two upstream deprecation warnings.
+- `npm run build` - TypeScript and Vite passed; the existing PDF chunk-size warning remains.
+- Live `POST /proposal/ask` for Q5 returned `conflict` with five verified evidence entries across documents 03 and 01.
+- `GET /healthz`, `GET /proposal`, known-absent `POST /proposal/ask`, and CORS from the Vite origin passed against the running services.
+- Live `POST /proposal/run` returned 14 requirement rows across all nine categories;
+  4 were met, 1 not met, 6 unclear, and 3 not addressed. The provider timed out
+  on the three priority questions and reviewer mapping during the final combined run;
+  those four named failures remained visible and retryable in the UI.
+- Headless Microsoft Edge verified the connected proposal view at 1440 px and the
+  responsive layout at 500 px. The browser showed the connected state, live checklist,
+  source buttons, prompt cards, and named operational failures without horizontal overflow.
+
+The built-in browser provider was unavailable, so the visual check used the installed
+Edge headless executable. Live checklist reliability still depends on the model returning
+every mandatory call quote verbatim; invalid quotations fail closed and appear in `failures`.

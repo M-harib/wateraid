@@ -1,21 +1,22 @@
 import { lazy, Suspense, useEffect, useMemo, useState } from 'react'
 import { ArrowLeft, ArrowRight, ArrowUpRight, BookOpenText, CalendarDays, CheckCircle2, ChevronRight, CircleAlert, ClipboardCheck, FileQuestion, FileSpreadsheet, FileText, FolderOpen, LayoutDashboard, Menu, MessageSquareText, Search, ShieldCheck, X } from 'lucide-react'
-import { askQuestion, loadDashboard, type AskAnswer, type DashboardConnection } from './api'
+import { askProposalQuestion, askQuestion, loadDashboard, loadProposalWorkspace, runProposalChecks, type AskAnswer, type DashboardConnection } from './api'
 import { BrandMark } from './Brand'
 import { ReviewDialog } from './components/ReviewDialog'
 import { documentById, documents } from './documents'
-import { evidenceLocation, type Finding, type Requirement } from './domain'
+import { evidenceLocation, type Finding, type ProposalWorkspace, type Requirement } from './domain'
 import { investigations, type Investigation } from './investigations'
 import { appendReview, evidenceFingerprint, latestReviewFor, loadReviews, type ReviewDecision, type ReviewRecord } from './reviews'
 
 const PdfPreview = lazy(() => import('./components/PdfPreview').then((module) => ({ default: module.PdfPreview })))
 
-export type DashboardSection = 'overview' | 'ask' | 'issues' | 'obligations' | 'calendar' | 'documents' | 'reviews'
+export type DashboardSection = 'overview' | 'proposal' | 'ask' | 'issues' | 'obligations' | 'calendar' | 'documents' | 'reviews'
 type Focus = { kind: 'finding'; id: string } | { kind: 'requirement'; id: string } | { kind: 'investigation'; id: string } | null
 type Props = { section: DashboardSection; onNavigate: (section: DashboardSection) => void; onExit: () => void }
 
 const nav: { section: DashboardSection; title: string; icon: typeof LayoutDashboard }[] = [
   { section: 'overview', title: 'Overview', icon: LayoutDashboard },
+  { section: 'proposal', title: 'Proposal review', icon: ClipboardCheck },
   { section: 'ask', title: 'Ask the documents', icon: MessageSquareText },
   { section: 'issues', title: 'Issues', icon: CircleAlert },
   { section: 'obligations', title: 'Obligations', icon: BookOpenText },
@@ -23,6 +24,14 @@ const nav: { section: DashboardSection; title: string; icon: typeof LayoutDashbo
   { section: 'documents', title: 'Source library', icon: FolderOpen },
   { section: 'reviews', title: 'Review history', icon: ShieldCheck },
 ]
+
+const proposalPrompts = [
+  { id: 'Q5', question: "Does the agreement's minimum contribution meet the call's cost-share requirement?" },
+  { id: 'Q21', question: 'Which proposed or reported construction activities may conflict with the call?' },
+  { id: 'Q23', question: 'Which claims in the proposal and results report lack supporting evidence in those documents?' },
+]
+
+const emptyProposalWorkspace: ProposalWorkspace = { findings: [], checklist: [], reviewerQuestions: [], failures: [] }
 
 function formatDate(value: string) {
   const parsed = new Date(`${value.slice(0, 10)}T12:00:00Z`)
@@ -55,12 +64,27 @@ export function Dashboard({ section, onNavigate, onExit }: Props) {
   const [askError, setAskError] = useState('')
   const [asking, setAsking] = useState(false)
   const [notice, setNotice] = useState('')
+  const [proposal, setProposal] = useState<ProposalWorkspace>(emptyProposalWorkspace)
+  const [proposalLoading, setProposalLoading] = useState(false)
+  const [proposalError, setProposalError] = useState('')
+  const [proposalQuestion, setProposalQuestion] = useState(proposalPrompts[0].question)
+  const [proposalAnswer, setProposalAnswer] = useState<AskAnswer | null>(null)
+  const [proposalAsking, setProposalAsking] = useState(false)
 
   useEffect(() => {
     let active = true
     loadDashboard().then((result) => { if (active) setConnection(result) })
     return () => { active = false }
   }, [])
+
+  useEffect(() => {
+    if (connection.mode !== 'connected') return
+    let active = true
+    loadProposalWorkspace()
+      .then((result) => { if (active) setProposal(result) })
+      .catch((error) => { if (active) setProposalError(error instanceof Error ? error.message : 'Could not load proposal checks.') })
+    return () => { active = false }
+  }, [connection.mode])
 
   useEffect(() => {
     if (!notice) return
@@ -122,6 +146,40 @@ export function Dashboard({ section, onNavigate, onExit }: Props) {
     finally { setAsking(false) }
   }
 
+  async function runProposalReview() {
+    if (proposalLoading) return
+    setProposalLoading(true)
+    setProposalError('')
+    try {
+      const result = await runProposalChecks()
+      setProposal(result)
+      setConnection(await loadDashboard())
+      setNotice('Proposal review complete')
+    } catch (error) {
+      setProposalError(error instanceof Error ? error.message : 'The proposal review could not finish.')
+    } finally {
+      setProposalLoading(false)
+    }
+  }
+
+  async function submitProposalQuestion(event: React.FormEvent) {
+    event.preventDefault()
+    if (!proposalQuestion.trim() || proposalAsking) return
+    setProposalAnswer(null)
+    setProposalError('')
+    if (connection.mode !== 'connected') { setProposalError('The analysis service is not connected.'); return }
+    setProposalAsking(true)
+    try {
+      setProposalAnswer(await askProposalQuestion(proposalQuestion.trim()))
+      setProposal(await loadProposalWorkspace())
+      setConnection(await loadDashboard())
+    } catch (error) {
+      setProposalError(error instanceof Error ? error.message : 'The proposal question could not be answered.')
+    } finally {
+      setProposalAsking(false)
+    }
+  }
+
   function saveReview(decision: ReviewDecision, note: string, correctedValue?: string) {
     if (!reviewFinding) return
     try {
@@ -138,7 +196,7 @@ export function Dashboard({ section, onNavigate, onExit }: Props) {
       <button className="dashboard-brand" type="button" onClick={onExit}><BrandMark /><span>GrantGuard</span></button>
       <div className="sidebar-case"><span className="sidebar-case-monogram">WC</span><span><strong>Water Care</strong><small>Taps for Rights</small></span></div>
       <span className="sidebar-caption">WORKSPACE</span>
-      <nav aria-label="Dashboard navigation">{nav.map(({ section: target, title, icon: Icon }) => <button type="button" key={target} className={`dashboard-nav-item ${section === target ? 'active' : ''}`} onClick={() => navigate(target)} aria-current={section === target ? 'page' : undefined}><Icon size={18} /><span>{title}</span>{target === 'issues' && findings.length > 0 && <em>{findings.length}</em>}</button>)}</nav>
+      <nav aria-label="Dashboard navigation">{nav.map(({ section: target, title, icon: Icon }) => <button type="button" key={target} className={`dashboard-nav-item ${section === target ? 'active' : ''}`} onClick={() => navigate(target)} aria-current={section === target ? 'page' : undefined}><Icon size={18} /><span>{title}</span>{target === 'proposal' && proposal.checklist.length > 0 && <em>{proposal.checklist.length}</em>}{target === 'issues' && findings.length > 0 && <em>{findings.length}</em>}</button>)}</nav>
       <div className="sidebar-bottom"><span className="sidebar-divider" /><span className="sidebar-caption">CASE VIEW</span><p>Historical scenario<br /><strong>{formatDate(connection.data.asOf)}</strong></p><button type="button" onClick={onExit}><ArrowLeft size={16} /> Back to site</button></div>
     </aside>
 
@@ -151,7 +209,7 @@ export function Dashboard({ section, onNavigate, onExit }: Props) {
           <div className="overview-feature"><div><span className="overview-feature-kicker"><MessageSquareText size={16} /> START HERE</span><h2>Ask the documents<br />a question.</h2><p>Trace the answer to its source, or see where the evidence is missing.</p><button className="solid-button" type="button" onClick={() => navigate('ask')}>Open Q&A <ArrowRight size={17} /></button></div><div className="overview-feature-art" aria-hidden="true"><div><span>QUESTION</span><strong>When is the final report due?</strong></div><div><span>SOURCE</span><strong>Agreement · cited page</strong></div><div><span>REVIEW</span><strong>Human decision required</strong></div></div></div>
           <div className="overview-stats"><div><span>Source files</span><strong>{String(documents.length).padStart(2, '0')}</strong><small>Original pack available</small></div><div><span>Issues to review</span><strong>{String(findings.length).padStart(2, '0')}</strong><small>{findings.length ? 'From the shared finding store' : 'No findings loaded yet'}</small></div><div><span>Current reviews</span><strong>{String(currentReviewCount).padStart(2, '0')}</strong><small>Matched to current findings</small></div></div>
           {connection.mode !== 'connected' && <div className="clean-banner"><FileQuestion size={20} /><div><strong>{connection.mode === 'unavailable' ? 'Analysis service unavailable' : 'Source pack preview'}</strong><p>{connection.mode === 'unavailable' ? connection.message : 'The documents are ready to inspect. Answers and findings will appear when the team’s analysis service is connected.'}</p></div></div>}
-          <div className="overview-links"><button type="button" onClick={() => navigate('issues')}><CircleAlert size={20} /><span><strong>Review issues</strong><small>Findings and guide questions</small></span><ArrowUpRight size={17} /></button><button type="button" onClick={() => navigate('documents')}><FolderOpen size={20} /><span><strong>Open source library</strong><small>Seven original files</small></span><ArrowUpRight size={17} /></button></div>
+          <div className="overview-links"><button type="button" onClick={() => navigate('proposal')}><ClipboardCheck size={20} /><span><strong>Check the proposal</strong><small>Call checklist and Q5, Q21, Q23</small></span><ArrowUpRight size={17} /></button><button type="button" onClick={() => navigate('issues')}><CircleAlert size={20} /><span><strong>Review issues</strong><small>Findings and guide questions</small></span><ArrowUpRight size={17} /></button><button type="button" onClick={() => navigate('documents')}><FolderOpen size={20} /><span><strong>Open source library</strong><small>Seven original files</small></span><ArrowUpRight size={17} /></button></div>
         </>}
 
         {section === 'ask' && <>
@@ -160,6 +218,19 @@ export function Dashboard({ section, onNavigate, onExit }: Props) {
           {askError && <div className="inline-error" role="alert">{askError}</div>}
           {answer && <div className="answer-panel"><span className="dashboard-eyebrow">{answer.status?.replaceAll('_', ' ') ?? 'RESPONSE'} · REVIEW THE SOURCES</span><p>{answer.answer}</p>{answer.evidence.length ? <div className="answer-sources">{answer.evidence.map((item, index) => <button type="button" key={`${item.documentId}-${index}`} onClick={() => { setFocus(null); openSource(item.documentId, item.locator.page) }}>{documentById[item.documentId]?.shortTitle} · {evidenceLocation({ ...item, id: `${index}`, version: null, verified: false })}<ArrowUpRight size={15} /></button>)}</div> : <small>No source references were returned. Treat this as unverified.</small>}</div>}
           <div className="ask-prompts"><span className="dashboard-eyebrow">FROM THE CHALLENGE GUIDE</span><h2>Questions to explore</h2><div>{investigations.map((item) => <button type="button" key={item.id} onClick={() => { setQuestion(item.question); setAnswer(null); setAskError('') }}><span>{String(item.questionNumber).padStart(2, '0')}</span><strong>{item.question}</strong><ChevronRight size={18} /></button>)}</div><p>These are guide prompts, not generated answers or compliance findings.</p></div>
+        </>}
+
+        {section === 'proposal' && <>
+          <SectionHeading eyebrow="PRE-SUBMISSION REVIEW / PROPOSAL" title="Check the proposal against the call." subtitle="Run the three priority questions and the requirement checklist, then inspect every cited source." aside={<span className="heading-count">{proposal.checklist.length} checks</span>} />
+          <div className="proposal-run-card"><div><span className="dashboard-eyebrow">PROPOSAL ASSISTANT</span><h2>{proposal.checklist.length ? 'Review results are ready.' : 'Run the source-backed review.'}</h2><p>The backend reads files 01–06, verifies quoted evidence, and uses code for cost-share and construction comparisons. A full run can take a few minutes.</p></div><button className="solid-button" type="button" onClick={runProposalReview} disabled={proposalLoading || connection.mode !== 'connected'}>{proposalLoading ? 'Checking documents…' : proposal.checklist.length ? 'Run again' : 'Run proposal checks'} <ArrowRight size={16} /></button></div>
+          <div className="proposal-prompts"><span className="dashboard-eyebrow">PRIORITY QUESTIONS</span>{proposalPrompts.map((item) => <button type="button" key={item.id} className={proposalQuestion === item.question ? 'active' : ''} onClick={() => { setProposalQuestion(item.question); setProposalAnswer(null); setProposalError('') }}><span>{item.id}</span><strong>{item.question}</strong></button>)}</div>
+          <form className="ask-composer proposal-composer" onSubmit={submitProposalQuestion}><label htmlFor="proposal-question">Ask the proposal assistant</label><textarea id="proposal-question" value={proposalQuestion} onChange={(event) => setProposalQuestion(event.target.value)} rows={3} /><div><span>Answers are limited to proposal-checking sources and verified excerpts.</span><button className="solid-button" type="submit" disabled={!proposalQuestion.trim() || proposalAsking || connection.mode !== 'connected'}>{proposalAsking ? 'Checking sources…' : 'Ask proposal'} <ArrowRight size={16} /></button></div></form>
+          {proposalError && <div className="inline-error" role="alert">{proposalError}</div>}
+          {proposal.failures.map((failure, index) => <div className="clean-banner proposal-failure" key={`${failure}-${index}`}><CircleAlert size={20} /><div><strong>One check needs another run</strong><p>{failure}</p></div></div>)}
+          {proposalAnswer && <div className="answer-panel"><span className="dashboard-eyebrow">{proposalAnswer.status.replaceAll('_', ' ')} · REVIEW THE SOURCES</span><p>{proposalAnswer.answer}</p>{proposalAnswer.evidence.length ? <div className="answer-sources">{proposalAnswer.evidence.map((item, index) => <button type="button" key={`${item.documentId}-${index}`} onClick={() => openSource(item.documentId, item.locator.page)}>{documentById[item.documentId]?.shortTitle} · {evidenceLocation({ ...item, id: `${index}`, version: null, verified: false })}<ArrowUpRight size={15} /></button>)}</div> : <small>No source references were returned. Treat this as unverified.</small>}</div>}
+          {proposal.findings.length > 0 && <section className="proposal-section"><div className="proposal-section-head"><div><span className="dashboard-eyebrow">PRIORITY FINDINGS</span><h2>What needs human review</h2></div><span>{proposal.findings.length} findings</span></div><div className="clean-list">{proposal.findings.map((item) => <button type="button" key={item.id} onClick={() => openSource(item.evidence[0].documentId, item.evidence[0].locator.page)}><span className="list-icon"><CircleAlert size={19} /></span><span className="list-copy"><small>{item.kind.replaceAll('_', ' ')} · {item.evidence.length} cited sources</small><strong>{item.title}</strong><span>{item.summary}</span></span><span className="row-status">{item.priority}</span><ChevronRight size={18} /></button>)}</div></section>}
+          <section className="proposal-section"><div className="proposal-section-head"><div><span className="dashboard-eyebrow">CALL REQUIREMENTS</span><h2>Checklist against proposal 02</h2></div>{proposal.checklist.length > 0 && <span>{proposal.checklist.filter((row) => row.status === 'met').length} met</span>}</div>{proposal.checklist.length ? <div className="proposal-checklist">{proposal.checklist.map((row) => <article key={row.id}><div><span className={`proposal-status status-${row.status}`}>{row.status.replaceAll('_', ' ')}</span><small>{row.category.replaceAll('_', ' ')}</small></div><h3>{row.requirement}</h3><p>{row.reason}</p>{row.absentSources.length > 0 && <small className="proposal-absent">Not in pack: {row.absentSources.join(', ')}</small>}<div className="proposal-evidence">{row.evidence.map((item, index) => <button type="button" key={`${item.id}-${index}`} onClick={() => openSource(item.documentId, item.locator.page)}><strong>{item.documentId}</strong><span>{evidenceLocation(item)}</span><ArrowUpRight size={14} /></button>)}</div></article>)}</div> : <EmptyState icon={ClipboardCheck} title="No proposal checks run yet" description="Start the review to compare the nine call-requirement categories with the preliminary proposal." />}</section>
+          {proposal.reviewerQuestions.length > 0 && <section className="proposal-section"><div className="proposal-section-head"><div><span className="dashboard-eyebrow">GAC REVIEW PREP</span><h2>Reviewer questions mapped</h2></div><span>{proposal.reviewerQuestions.length} questions</span></div><div className="reviewer-map">{proposal.reviewerQuestions.map((row, index) => <article key={`${row.question.id}-${index}`}><span className={`proposal-status status-${row.status}`}>{row.status.replaceAll('_', ' ')}</span><p>“{row.question.excerpt}”</p><small>{row.reason}</small><div className="proposal-evidence"><button type="button" onClick={() => openSource(row.question.documentId, row.question.locator.page)}><strong>06</strong><span>{evidenceLocation(row.question)}</span><ArrowUpRight size={14} /></button>{row.proposal.map((item, proposalIndex) => <button type="button" key={`${item.id}-${proposalIndex}`} onClick={() => openSource(item.documentId, item.locator.page)}><strong>02</strong><span>{evidenceLocation(item)}</span><ArrowUpRight size={14} /></button>)}</div></article>)}</div></section>}
         </>}
 
         {section === 'issues' && <>

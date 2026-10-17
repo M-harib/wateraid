@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { FindingSchema, RequirementSchema, type DashboardData, type Finding, type Requirement } from './domain'
+import { FindingSchema, ProposalWorkspaceSchema, RequirementSchema, type DashboardData, type Finding, type ProposalWorkspace, type Requirement } from './domain'
 
 export type DashboardConnection =
   | { mode: 'preview'; data: DashboardData }
@@ -84,6 +84,57 @@ export async function askQuestion(question: string): Promise<AskAnswer> {
     if (!response.ok) throw new Error(`Question service returned ${response.status}`)
     const parsed = AnswerSchema.safeParse(await response.json())
     if (!parsed.success) throw new Error('Question response did not match the provisional frontend schema')
+    return parsed.data
+  } finally {
+    window.clearTimeout(timeout)
+  }
+}
+
+async function proposalRequest(path: string, init?: RequestInit, timeoutMs = 20000): Promise<ProposalWorkspace> {
+  const baseUrl = import.meta.env.VITE_API_BASE_URL?.trim().replace(/\/$/, '')
+  if (!baseUrl) throw new Error('Connect the analysis service to run proposal checks.')
+  const controller = new AbortController()
+  const timeout = window.setTimeout(() => controller.abort(), timeoutMs)
+  try {
+    const response = await fetch(`${baseUrl}${path}`, { ...init, signal: controller.signal })
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}))
+      throw new Error(typeof body.detail === 'string' ? body.detail : `Proposal service returned ${response.status}`)
+    }
+    const parsed = ProposalWorkspaceSchema.safeParse(await response.json())
+    if (!parsed.success) throw new Error('Proposal response did not match the dashboard schema')
+    return parsed.data
+  } finally {
+    window.clearTimeout(timeout)
+  }
+}
+
+export function loadProposalWorkspace(): Promise<ProposalWorkspace> {
+  return proposalRequest('/proposal')
+}
+
+export function runProposalChecks(): Promise<ProposalWorkspace> {
+  return proposalRequest('/proposal/run', { method: 'POST' }, 360000)
+}
+
+export async function askProposalQuestion(question: string): Promise<AskAnswer> {
+  const baseUrl = import.meta.env.VITE_API_BASE_URL?.trim().replace(/\/$/, '')
+  if (!baseUrl) throw new Error('Connect the analysis service to ask a proposal question.')
+  const controller = new AbortController()
+  const timeout = window.setTimeout(() => controller.abort(), 120000)
+  try {
+    const response = await fetch(`${baseUrl}/proposal/ask`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question }),
+      signal: controller.signal,
+    })
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({}))
+      throw new Error(typeof body.detail === 'string' ? body.detail : `Proposal question service returned ${response.status}`)
+    }
+    const parsed = AnswerSchema.safeParse(await response.json())
+    if (!parsed.success) throw new Error('Proposal answer did not match the dashboard schema')
     return parsed.data
   } finally {
     window.clearTimeout(timeout)
