@@ -2,7 +2,7 @@ import { z } from 'zod'
 
 export const EvidenceSchema = z.object({
   id: z.string().min(1),
-  documentId: z.enum(['00', '01', '02', '03', '04', '05', '06']),
+  documentId: z.string().min(1),
   version: z.string().min(1).nullable(),
   locator: z.object({
     page: z.number().int().positive().optional(),

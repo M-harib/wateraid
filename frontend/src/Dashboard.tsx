@@ -7,7 +7,7 @@ import { AskPanel } from './components/AskPanel'
 import { ThemeToggle } from './components/ThemeToggle'
 import { DraftWorkspace } from './components/DraftWorkspace'
 import { ReportingCalendar } from './components/ReportingCalendar'
-import { ProjectDocuments } from './components/ProjectDocuments'
+import { BackendDocuments } from './components/BackendDocuments'
 import { documentById, documents } from './documents'
 import { evidenceLocation, type Finding, type ProposalWorkspace, type Requirement } from './domain'
 import { investigations, type Investigation } from './investigations'
@@ -291,7 +291,7 @@ export function Dashboard({ section, onNavigate, onExit, onProjects, theme, onTo
       <header className="dashboard-topbar"><button className="dashboard-mobile-menu" type="button" onClick={() => setMobileNav(true)} aria-label="Open navigation"><Menu size={21} /></button><span className="dashboard-crumb">Workspace <ChevronRight size={15} /> <strong>{nav.find((item) => item.section === section)?.title}</strong></span><div className="dashboard-topbar-actions"><span className={`service-state ${connection.mode === 'connected' ? 'connected' : ''}`}><i /> {connection.mode === 'connected' ? 'Analysis connected' : connection.mode === 'unavailable' ? 'Service unavailable' : 'Source pack preview'}</span><ThemeToggle theme={theme} onToggle={onToggleTheme} /></div></header>
 
       <main className={`dashboard-main dashboard-${section}`}>
-        {section === 'intake' && <ProjectDocuments projectId="taps-for-rights" projectName="Taps for Rights" onGoDraft={() => navigate('draft')} onOpenBundled={(id) => openSource(id)} />}
+        {section === 'intake' && <BackendDocuments projectId="taps-for-rights" projectName="Taps for Rights" connected={connection.mode === 'connected'} />}
         {section === 'draft' && <DraftWorkspace projectId="taps-for-rights" projectName="Taps for Rights" findings={findings} requirements={requirements} analysisConnected={connection.mode === 'connected'} proposal={proposalAvailable ? proposal : null} proposalBusy={proposalLoading} proposalError={proposalError} onRunProposal={runProposalReview} onOpenIssue={openFinding} onOpenRequirement={openRequirement} onOpenSource={openCitation} onOpenIntake={() => navigate('intake')} />}
 
         {section === 'proposal' && <>
