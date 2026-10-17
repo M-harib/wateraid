@@ -5,12 +5,13 @@ from core.dispatch import Intent
 
 AS_OF = date(2022, 6, 30)
 PROPOSAL_SOURCE_DOCS = ("01", "02", "03", "04", "05", "06")
+GENERIC_PROPOSAL_DOCS = ("01", "02", "05", "06")
 TABLE = {
     "cost_share_vs_call": Intent("cost_share_vs_call", ("03", "01"), ("check_cost_share", "conflict"), "strong"),
     "construction_vs_call": Intent("construction_vs_call", ("01", "02", "03", "04"), ("callmatch", "conflict"), "strong"),
     "unsupported_claims": Intent("unsupported_claims", ("02", "04"), ("grounding",), "strong"),
     "logic_model_quality": Intent("logic_model_quality", ("05",), ("check_target_baseline", "outcome_quality"), "mini"),
-    "generic_qa": Intent("generic_qa", PROPOSAL_SOURCE_DOCS, (), "strong"),
+    "generic_qa": Intent("generic_qa", GENERIC_PROPOSAL_DOCS, (), "strong"),
 }
 KEYWORDS = {
     "cost_share_vs_call": ("cost share", "cost-share", "minimum contribution"),

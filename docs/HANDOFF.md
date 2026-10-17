@@ -168,11 +168,13 @@ model, verifies every returned quotation, and returns an explicit retrieved-page
 abstention when the evidence cannot support an answer. Known Q5/Q21/Q23 and PMF-quality
 intents retain their specialized deterministic paths.
 
-`POST /proposal/ask` now accepts optional camelCase `documentIds`. The proposal dashboard
-shows selectable source chips for files 01–06 and sends the selected scope with custom
-questions; priority-question buttons restore the full scope. No `core/schema.py` shapes
-changed. Synthetic tests cover generic routing, selected-source enforcement, verified
-answers and abstention.
+`POST /proposal/ask` accepts optional camelCase `documentIds` for API callers, but the
+proposal dashboard needs no source selection. Generic questions automatically search the
+call (01), proposal (02), PMF (05), and reviewer-question rows (06). Specialized checks
+can additionally use agreement/report sources 03 and 04. The UI directs reporting,
+agreement, and broader pack questions to the separate Ask the documents workspace. No
+`core/schema.py` shapes changed. Synthetic tests cover generic routing, optional-source
+enforcement, verified answers and abstention.
 
 Verification:
 

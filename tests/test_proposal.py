@@ -337,6 +337,7 @@ def test_dispatch_has_expected_sources_and_tiers():
     assert TABLE["construction_vs_call"].docs == ("01", "02", "03", "04")
     assert TABLE["unsupported_claims"].tier == "strong"
     assert TABLE["logic_model_quality"].tier == "mini"
+    assert TABLE["generic_qa"].docs == ("01", "02", "05", "06")
     assert dispatch("Who manages project delivery?").name == "generic_qa"
     assert dispatch("What construction activities are proposed?").name == "generic_qa"
     assert dispatch("What is the indicator baseline?").name == "generic_qa"
