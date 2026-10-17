@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { ArrowDown, ArrowRight, ArrowUp, Check, FileText, FolderOpen, GripVertical, Plus, Printer, Sparkles, Trash2, Upload } from 'lucide-react'
-import { askProposal, askQuestion, loadProposal, runProposalChecks, type AskAnswer, type ChecklistRow, type ProposalView } from '../api'
-import { type Finding, type Requirement } from '../domain'
+import { askProposalQuestion, askQuestion, type AskAnswer } from '../api'
+import { type Finding, type ProposalChecklistRow, type ProposalWorkspace, type Requirement } from '../domain'
 import { loadDraft, saveDraft, type Draft } from '../draft'
 import { documentById } from '../documents'
 import { addLocalDocument } from '../localDocuments'
@@ -13,13 +13,18 @@ type Props = {
   findings?: Finding[]
   requirements?: Requirement[]
   analysisConnected?: boolean
+  /** Proposal view owned by the dashboard; null/undefined when the proposal API is unavailable. */
+  proposal?: ProposalWorkspace | null
+  proposalBusy?: boolean
+  proposalError?: string
+  onRunProposal?: () => void
   onOpenIssue?: (finding: Finding) => void
   onOpenRequirement?: (requirement: Requirement) => void
-  onOpenSource?: (documentId: string, page?: number) => void
+  onOpenSource?: (documentId: string, page?: number, excerpt?: string) => void
   onOpenIntake?: () => void
 }
 
-const checklistLabel: Record<ChecklistRow['status'], string> = { met: 'Met', not_met: 'Not met', unclear: 'Unclear', not_addressed: 'Not addressed' }
+const checklistLabel: Record<ProposalChecklistRow['status'], string> = { met: 'Met', not_met: 'Not met', unclear: 'Unclear', not_addressed: 'Not addressed' }
 
 function splitSuggestions(answer: string): string[] {
   const lines = answer.split(/\n+/).map((line) => line.replace(/^\s*(?:[-*•]|\d+[.)])\s*/, '').trim()).filter(Boolean)
@@ -53,7 +58,7 @@ async function readUpload(file: File): Promise<{ parts: { heading: string; body:
   return { parts: [{ heading: file.name.replace(/\.[^.]+$/, ''), body: text }], kind: 'text' }
 }
 
-export function DraftWorkspace({ projectId, projectName, findings = [], requirements = [], analysisConnected = false, onOpenIssue, onOpenRequirement, onOpenSource, onOpenIntake }: Props) {
+export function DraftWorkspace({ projectId, projectName, findings = [], requirements = [], analysisConnected = false, proposal = null, proposalBusy = false, proposalError = '', onRunProposal, onOpenIssue, onOpenRequirement, onOpenSource, onOpenIntake }: Props) {
   const [draft, setDraft] = useState<Draft>(() => loadDraft(projectId, projectName))
   const [error, setError] = useState('')
   const [notice, setNotice] = useState('')
@@ -71,33 +76,15 @@ export function DraftWorkspace({ projectId, projectName, findings = [], requirem
   const caretRef = useRef<{ id: string; start: number; end: number } | null>(null)
   const activeSection = draft.sections.find((item) => item.id === selectedId) ?? draft.sections[0]
   const suggestionItems = useMemo(() => answer ? splitSuggestions(answer.answer) : [], [answer])
-  // Proposal analysis exists only for the bundled demo case; local projects never call it.
-  const usesProposalApi = analysisConnected && projectId === 'taps-for-rights'
-  const [proposal, setProposal] = useState<ProposalView | null>(null)
-  const [proposalAvailable, setProposalAvailable] = useState(false)
-  const [proposalBusy, setProposalBusy] = useState(false)
-  const [proposalError, setProposalError] = useState('')
+  // Proposal analysis exists only for the bundled demo case; the dashboard passes it in.
+  const proposalAvailable = analysisConnected && projectId === 'taps-for-rights' && proposal !== null
   const deskFindings = proposal?.findings.length ? proposal.findings : findings
 
   useEffect(() => { const next = loadDraft(projectId, projectName); setDraft(next); setSelectedId(next.sections[0]?.id ?? ''); setAnswer(null) }, [projectId, projectName])
-  useEffect(() => {
-    if (!usesProposalApi) return
-    let active = true
-    loadProposal()
-      .then((view) => { if (active) { setProposal(view); setProposalAvailable(true) } })
-      .catch(() => { if (active) setProposalAvailable(false) })
-    return () => { active = false }
-  }, [usesProposalApi])
 
-  async function runChecks() {
-    setProposalBusy(true); setProposalError('')
-    try { setProposal(await runProposalChecks()) }
-    catch (cause) { setProposalError(cause instanceof Error ? cause.message : 'Proposal checks could not run.') }
-    finally { setProposalBusy(false) }
-  }
-  function openChecklistRow(row: ChecklistRow) {
+  function openChecklistRow(row: ProposalChecklistRow) {
     const first = row.evidence[0]
-    if (first) onOpenSource?.(first.documentId, first.locator.page)
+    if (first) onOpenSource?.(first.documentId, first.locator.page, first.excerpt)
   }
 
   function commit(next: Draft, changed = true, keepSuggestion = false) {
@@ -198,7 +185,7 @@ export function DraftWorkspace({ projectId, projectName, findings = [], requirem
     setBusy(true); setError(''); setAnswer(null); setAddedItems([]); setSelectedPhrase('')
     try {
       const prompt = `For the proposal section titled "${activeSection.heading}", ${question.trim()} Use only the supplied project source documents; say when evidence is insufficient. Current draft text: ${activeSection.body.slice(0, 1500)}`
-      const response = proposalAvailable ? await askProposal(prompt) : await askQuestion(prompt)
+      const response = proposalAvailable ? await askProposalQuestion(prompt) : await askQuestion(prompt)
       setSuggestedForId(activeSection.id)
       setAnswer(response)
     } catch (cause) { setError(cause instanceof Error ? cause.message : 'The analysis service is unavailable.') }
@@ -259,7 +246,7 @@ export function DraftWorkspace({ projectId, projectName, findings = [], requirem
         <div className="draft-review-scroll">
           {proposalAvailable && <div className="draft-review-block"><span className="dashboard-eyebrow">PROPOSAL CHECKS</span>
             {proposal && (proposal.checklist.length > 0 || proposal.findings.length > 0) ? <p>Checked against the 2018 call and the pack. Each result needs human review.</p> : <p>No proposal checks have run since the analysis service started.</p>}
-            <button type="button" className="draft-ask" onClick={() => void runChecks()} disabled={proposalBusy}>{proposalBusy ? 'Running checks… (can take a few minutes)' : proposal?.checklist.length ? 'Re-run proposal checks' : 'Run proposal checks'} <ArrowRight size={14} /></button>
+            <button type="button" className="draft-ask" onClick={() => onRunProposal?.()} disabled={proposalBusy || !onRunProposal}>{proposalBusy ? 'Running checks… (can take a few minutes)' : proposal?.checklist.length ? 'Re-run proposal checks' : 'Run proposal checks'} <ArrowRight size={14} /></button>
             {proposalError && <small className="draft-desk-error" role="alert">{proposalError}</small>}
             {proposal?.failures.map((failure) => <small className="draft-desk-error" key={failure}>{failure}</small>)}
           </div>}

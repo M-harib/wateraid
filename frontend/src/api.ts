@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { EvidenceSchema, FindingSchema, RequirementSchema, type DashboardData, type Finding, type Requirement } from './domain'
+import { FindingSchema, ProposalWorkspaceSchema, RequirementSchema, type DashboardData, type Finding, type ProposalWorkspace, type Requirement } from './domain'
 
 export type DashboardConnection =
   | { mode: 'preview'; data: DashboardData }
@@ -69,25 +69,29 @@ export async function loadDashboard(): Promise<DashboardConnection> {
   }
 }
 
-// Proposal tool (backend `feat/proposal`): GET /proposal returns cached views only;
-// POST /proposal/run starts the model checks; POST /proposal/ask answers one question.
-const ChecklistRowSchema = z.object({
-  id: z.string().min(1),
-  category: z.string(),
-  requirement: z.string().min(1),
-  status: z.enum(['met', 'not_met', 'unclear', 'not_addressed']),
-  reason: z.string(),
-  evidence: z.array(EvidenceSchema).default([]),
-  absentSources: z.array(z.unknown()).default([]),
-})
-const ProposalViewSchema = z.object({
-  findings: z.array(FindingSchema).default([]),
-  checklist: z.array(ChecklistRowSchema).default([]),
-  failures: z.array(z.string()).default([]),
-})
-export type ChecklistRow = z.infer<typeof ChecklistRowSchema>
-export type ProposalView = z.infer<typeof ProposalViewSchema>
+export async function askQuestion(question: string): Promise<AskAnswer> {
+  const baseUrl = import.meta.env.VITE_API_BASE_URL?.trim().replace(/\/$/, '')
+  if (!baseUrl) throw new Error('Connect the analysis service to ask a question.')
+  const controller = new AbortController()
+  const timeout = window.setTimeout(() => controller.abort(), 20000)
+  try {
+    const response = await fetch(`${baseUrl}/ask`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ question }),
+      signal: controller.signal,
+    })
+    if (!response.ok) throw new Error(`Question service returned ${response.status}`)
+    const parsed = AnswerSchema.safeParse(await response.json())
+    if (!parsed.success) throw new Error('Question response did not match the provisional frontend schema')
+    return parsed.data
+  } finally {
+    window.clearTimeout(timeout)
+  }
+}
 
+// Proposal tool: GET /proposal returns cached views only; POST /proposal/run starts the
+// model checks (can take minutes); POST /proposal/ask answers one question with citations.
 function apiBase(): string {
   const baseUrl = import.meta.env.VITE_API_BASE_URL?.trim().replace(/\/$/, '')
   if (!baseUrl) throw new Error('Connect the analysis service first.')
@@ -113,48 +117,27 @@ async function requestJson(path: string, init: RequestInit, timeoutMs: number): 
   }
 }
 
-function parseProposal(body: unknown): ProposalView {
-  const parsed = ProposalViewSchema.safeParse(body)
-  if (!parsed.success) throw new Error('Proposal response did not match the frontend schema')
+function parseProposal(body: unknown): ProposalWorkspace {
+  const parsed = ProposalWorkspaceSchema.safeParse(body)
+  if (!parsed.success) throw new Error('Proposal response did not match the dashboard schema')
   return parsed.data
 }
 
-export async function loadProposal(): Promise<ProposalView> {
-  return parseProposal(await requestJson('/proposal', {}, 8000))
+export async function loadProposalWorkspace(): Promise<ProposalWorkspace> {
+  return parseProposal(await requestJson('/proposal', {}, 20_000))
 }
 
-export async function runProposalChecks(): Promise<ProposalView> {
-  return parseProposal(await requestJson('/proposal/run', { method: 'POST' }, 300_000))
+export async function runProposalChecks(): Promise<ProposalWorkspace> {
+  return parseProposal(await requestJson('/proposal/run', { method: 'POST' }, 360_000))
 }
 
-export async function askProposal(question: string, documentIds?: string[]): Promise<AskAnswer> {
+export async function askProposalQuestion(question: string, documentIds?: string[]): Promise<AskAnswer> {
   const body = await requestJson('/proposal/ask', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(documentIds?.length ? { question, documentIds } : { question }),
   }, 150_000)
   const parsed = AnswerSchema.safeParse(body)
-  if (!parsed.success) throw new Error('Proposal answer did not match the frontend schema')
+  if (!parsed.success) throw new Error('Proposal answer did not match the dashboard schema')
   return parsed.data
-}
-
-export async function askQuestion(question: string): Promise<AskAnswer> {
-  const baseUrl = import.meta.env.VITE_API_BASE_URL?.trim().replace(/\/$/, '')
-  if (!baseUrl) throw new Error('Connect the analysis service to ask a question.')
-  const controller = new AbortController()
-  const timeout = window.setTimeout(() => controller.abort(), 20000)
-  try {
-    const response = await fetch(`${baseUrl}/ask`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ question }),
-      signal: controller.signal,
-    })
-    if (!response.ok) throw new Error(`Question service returned ${response.status}`)
-    const parsed = AnswerSchema.safeParse(await response.json())
-    if (!parsed.success) throw new Error('Question response did not match the provisional frontend schema')
-    return parsed.data
-  } finally {
-    window.clearTimeout(timeout)
-  }
 }
