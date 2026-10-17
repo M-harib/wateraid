@@ -1,0 +1,8 @@
+[
+  {
+    "id": "Q12",
+    "question": "Which version of GAC's General Terms and Conditions applies to this agreement?",
+    "expect_status": "not_found",
+    "note": "Answerable only as: version in force on Effective Date 2019-06-21; GTC text not in pack."
+  }
+]
