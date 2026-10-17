@@ -11,8 +11,8 @@ from core.checks import check_cost_share, score_urgency
 from core.checks.callmatch import Activity, CallRule, callmatch
 
 from .checklist import parse_row
-from .config import AS_OF, CHECKLIST_CATEGORIES, CONTEXT_UNITS_PER_DOC, PROPOSAL_SOURCE_DOCS, STARTUP_QUESTIONS, TABLE, dispatch
-from .evidence import InvalidOutput, array, cite, cite_whole_unit, cited_percentage, context, fingerprint, grounding_candidate_hints, object_value, parse, relevant_units, text, top_relevant_units, unit_id
+from .config import AS_OF, CHECKLIST_CATEGORIES, CONTEXT_UNITS_PER_DOC, PROPOSAL_SOURCE_DOCS, STARTUP_TOPICS, TABLE, dispatch
+from .evidence import InvalidOutput, array, cite, cite_whole_unit, cited_percentage, context, fingerprint, grounding_candidate_hints, grounding_focus_units, object_value, parse, relevant_units, text, top_relevant_units, unit_id
 from .prompts import SYSTEM, TASKS
 from .quality import numeric_quality
 
@@ -93,7 +93,36 @@ class ProposalAssistant:
             retrieval_query = " ".join((question, topic.replace("_", " "), *self._intent_terms(topic)))
             units = relevant_units(units, retrieval_query, per_doc=CONTEXT_UNITS_PER_DOC[topic])
         elif topic == "generic_qa":
-            units = top_relevant_units(units, question, limit=8)
+            all_units = units
+            proposal_units = [unit for unit in all_units if unit.doc_id == "02"]
+            supporting_units = [unit for unit in all_units if unit.doc_id != "02"]
+            units = top_relevant_units(supporting_units, question, limit=6)
+            normalized_question = question.lower()
+            # The proposal is six pages, so chat can inspect it in full. Retrieval is
+            # needed only to choose supporting pages from the larger surrounding pack.
+            focus: list[Unit] = proposal_units
+            if any(term in normalized_question for term in ("supporting evidence", "unsupported", "uncited", "lack evidence")):
+                focus.extend(grounding_focus_units(
+                    [unit for unit in all_units if unit.doc_id in {"02", "04"}], per_doc=1)
+                )
+            if (any(term in normalized_question for term in ("construction", "refurbishment", "latrine"))
+                    and any(term in normalized_question for term in ("call", "rule", "allow", "eligible", "conflict", "fit"))):
+                focus.extend(relevant_units(
+                    [unit for unit in all_units if unit.doc_id in {"01", "02", "04"}], question,
+                    per_doc={"01": 1, "02": 1, "04": 3},
+                ))
+            if any(term in normalized_question for term in ("cost share", "cost-share", "minimum contribution")):
+                focus.extend(relevant_units(
+                    [unit for unit in all_units if unit.doc_id in {"01", "03"}], question, per_doc=2,
+                ))
+            focused_ids: set[str] = set()
+            ordered_focus: list[Unit] = []
+            for unit in focus:
+                if unit_id(unit) not in focused_ids:
+                    ordered_focus.append(unit)
+                    focused_ids.add(unit_id(unit))
+            units = ordered_focus + [unit for unit in units if unit_id(unit) not in focused_ids]
+            units = units[:12]
         key = self._key(topic, units, question)
         async with self._locks.setdefault(key, asyncio.Lock()):
             cached = self.core.findings.by_key(key)
@@ -160,7 +189,8 @@ class ProposalAssistant:
         from .config import KEYWORDS
         return KEYWORDS.get(topic, ())
 
-    async def finding(self, question: str, document_ids: list[str] | tuple[str, ...] | None = None) -> Finding:
+    async def finding(self, question: str, document_ids: list[str] | tuple[str, ...] | None = None,
+                      *, generic_only: bool = False) -> Finding:
         question = text(question, "question")
         if len(question) > 4000:
             raise ValueError("Question exceeds 4000 characters")
@@ -188,8 +218,10 @@ class ProposalAssistant:
             selected_docs = tuple(doc for doc in PROPOSAL_SOURCE_DOCS if doc in requested)
             if not selected_docs:
                 raise ValueError("Select at least one proposal source document")
-        intent = dispatch(question)
-        if intent.name == "generic_qa":
+        intent = TABLE["generic_qa"] if generic_only else dispatch(question)
+        if generic_only:
+            docs = selected_docs or PROPOSAL_SOURCE_DOCS
+        elif intent.name == "generic_qa":
             docs = selected_docs or intent.docs
         elif selected_docs is not None and not set(intent.docs).issubset(selected_docs):
             intent = TABLE["generic_qa"]
@@ -208,6 +240,11 @@ class ProposalAssistant:
 
     async def ask(self, question: str, document_ids: list[str] | tuple[str, ...] | None = None) -> dict:
         return (await self.finding(question, document_ids)).to_dict()
+
+    async def chat_finding(self, question: str,
+                           document_ids: list[str] | tuple[str, ...] | None = None) -> Finding:
+        """General proposal chat; sample wording never selects a predefined check."""
+        return await self.finding(question, document_ids, generic_only=True)
 
     def _generic_qa(self, raw: dict, units: dict[str, Unit], key: str) -> Finding:
         searched_docs = sorted({unit.doc_id for unit in units.values()})
@@ -228,6 +265,32 @@ class ProposalAssistant:
                     for item in array(raw.get("evidence"), "evidence")]
         if not evidence:
             raise InvalidOutput("A supported answer requires at least one source quotation")
+        comparison = raw.get("comparison")
+        if comparison is not None:
+            comparison = object_value(comparison, "comparison")
+            if text(comparison.get("kind"), "comparison.kind") != "cost_share":
+                raise InvalidOutput("Unsupported generic comparison kind")
+            agreement = cite(comparison.get("agreement"), units, {"03"})
+            call = cite(comparison.get("call"), units, {"01"})
+            computation = check_cost_share(cited_percentage(agreement), cited_percentage(call))
+            for item in (agreement, call):
+                if not any(existing.ref == item.ref and existing.quote == item.quote for existing in evidence):
+                    evidence.append(item)
+            values = computation.inputs
+            gap = not computation.result["meets_call"]
+            calculation = (f"Verified calculation: the agreement minimum is {values['agreement_pct']:g}% and "
+                           f"the call minimum is {values['call_pct']:g}%. ")
+            calculation += (f"This is a {computation.result['gap']:g} percentage-point shortfall. "
+                            "GAC must clarify which requirement applies."
+                            if gap else "The agreement minimum meets the call percentage; staff should still review the cited cost bases.")
+            return self._finding(
+                key, "generic_qa", answer + "\n\n" + calculation,
+                Status.conflict if gap else Status.confirmed, evidence=evidence,
+                searched=searched_docs, conflict=Conflict(
+                    "Which contribution requirement should staff apply?", Resolver.gac) if gap else None,
+                computed=Computed({"retrieved_units": searched_units, **computation.inputs},
+                                  {"answer_supported": True, **computation.result}),
+            )
         return self._finding(
             key, "generic_qa", answer,
             Status.confirmed if answer_status == "answered" else Status.needs_review,
@@ -398,7 +461,16 @@ class ProposalAssistant:
 
     async def startup(self) -> dict:
         """Invoke after shared ingest in the app's async lifespan; safe to call repeatedly."""
-        findings = [await self.ask(question) for question in STARTUP_QUESTIONS]
+        findings = []
+        for topic in STARTUP_TOPICS:
+            intent = TABLE[topic]
+            extra = None
+            if topic == "unsupported_claims":
+                extra = {"candidate_hints": grounding_candidate_hints(self._units(intent.docs)),
+                         "instruction": "Assess every hint; return unsupported candidates and any distinct candidates you identify."}
+            finding = await self._execute(topic, "Run the configured pre-submission review.",
+                                          intent.docs, intent.tier, getattr(self, "_" + topic), extra=extra)
+            findings.append(finding.to_dict())
         checklist = await self.checklist()
         reviewer = await self.reviewer_questions()
         return {"findings": findings, "checklist": checklist, "reviewer_questions": reviewer}

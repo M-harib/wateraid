@@ -25,11 +25,7 @@ CONTEXT_UNITS_PER_DOC = {
     "cost_share_vs_call": 2,
     "construction_vs_call": {"01": 1, "02": 1, "03": 1, "04": 2},
 }
-STARTUP_QUESTIONS = (
-    "Does the agreement's minimum contribution meet the call's cost-share requirement?",
-    "Which proposed or reported construction activities may conflict with the call?",
-    "Which claims in the proposal and results report lack supporting evidence in those documents?",
-)
+STARTUP_TOPICS = ("cost_share_vs_call", "construction_vs_call", "unsupported_claims")
 CHECKLIST_CATEGORIES = (
     "eligibility", "funding_range", "duration", "cost_share", "location", "local_partners",
     "construction_refurbishment", "required_outcomes", "required_documents",

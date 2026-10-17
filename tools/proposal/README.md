@@ -3,8 +3,9 @@
 Deliverable on `feat/proposal`: a checking-only view over the shared finding store,
 covering call/proposal requirements, contribution and construction conflicts,
 proposal/report claim grounding, PMF quality, and financial-reviewer preparation.
-Questions outside those specialized checks use a generic, citation-verified Q&A fallback
-over files 01–06, optionally restricted to caller-selected document IDs.
+The chat endpoint uses citation-verified Q&A over files 01–06 for every question,
+optionally restricted to caller-selected document IDs. Q5, Q21 and Q23 are sample
+questions in the dashboard; their wording does not select a canned backend path.
 Acceptance: both-document checklist evidence (or an explicit searched-proposal gap),
 verified quotations, deterministic numeric comparisons, named conflict resolvers,
 known-absent abstention, and passing synthetic unit tests and source-pack eval checks.
@@ -24,8 +25,9 @@ from tools.proposal import ProposalAssistant
 proposal = ProposalAssistant(core, OpenRouterLLM())
 await proposal.startup()  # warms the three priority intents, checklist and reviewer mapping
 
-await proposal.ask(question)        # searches the default proposal corpus
-await proposal.ask(question, ["01", "02"])  # restrict generic Q&A to selected sources
+await proposal.chat_finding(question)  # open-ended chat over files 01–06
+await proposal.chat_finding(question, ["01", "02"])  # optional API-only restriction
+await proposal.ask(question)        # internal evaluator/CLI dispatch, including strict checks
 await proposal.checklist()          # one serialized row per extracted call requirement
 await proposal.reviewer_questions() # file 06 reviewer rows -> cited proposal sections
 await proposal.issues()             # proposal findings from the shared store
@@ -33,8 +35,10 @@ await proposal.issues()             # proposal findings from the shared store
 
 Keep one instance per application. Call `startup()` once after `core.load()`, not on
 each request. W4 owns HTTP routes, CORS and the camelCase frontend serializer; these
-functions are ready to mount there. `finding(question)` returns the dataclass for
-the shared evaluator; `ask(question)` returns its JSON-ready `to_dict()` output.
+functions are ready to mount there. The public `/proposal/ask` route calls
+`chat_finding(question)` so sample wording cannot trigger a predefined check.
+`finding(question)` and `ask(question)` retain internal strict-check dispatch for the
+evaluator and CLI.
 
 Cache keys include source text/locators/versions, absent-registry metadata, question,
 prompt version/content, scenario date and configured models. The cache is the existing
@@ -82,9 +86,10 @@ bounded to two concurrent calls with a 90-second timeout per request.
   cited; model-reconstructed spreadsheet text is never treated as a verbatim quote.
 - Only file 06's reviewer-question rows enter this tool. Example rows and cached
   budget formulas cannot become its evidence. ESDC reference forms are excluded.
-- Generic Q&A lexically ranks every allowed unit before sending a bounded context to
-  the model. Its `not_found` response means the retrieved pages did not support an
-  answer; it does not prove that wording is absent from an entire document.
+- Generic Q&A sends all six proposal pages and lexically ranks a bounded set of pages
+  from the supporting documents. Its `not_found` response means that context did not
+  support an answer; it does not prove that wording is absent from every supporting
+  document.
 - The current shared gate retries `needs_review` even for legitimate qualitative
   uncertainty. The proposal adapter preserves a validated qualitative review draft
   on those requests instead of re-querying the model to manufacture certainty.

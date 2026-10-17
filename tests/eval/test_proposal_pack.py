@@ -56,6 +56,37 @@ async def test_pack_quotes_math_and_shared_scorer(core):
             assert normalize(fragment) in normalize(finding.claim)
 
 
+async def test_general_chat_retrieves_required_sample_evidence(core):
+    for gold in [item for item in load_gold() if item["id"] in {"Q5", "Q21", "Q23"}]:
+        supplied = []
+
+        def respond(tier, system, user):
+            supplied.extend(item["unit_id"] for item in json.loads(user)["source_units"])
+            return json.dumps({"not_found": "retrieval-only evaluation", "evidence": []})
+
+        await ProposalAssistant(core, FakeLLM(respond)).chat_finding(gold["question"])
+        expected = {citation.replace(":p.", ":p") for citation in gold["must_cite"]}
+        assert expected.issubset(set(supplied)), (gold["id"], supplied)
+
+
+async def test_general_chat_retrieves_proposal_evidence_for_varied_questions(core):
+    cases = {
+        "Where will the proposed project operate?": "02:p2",
+        "How long is the proposed project?": "02:p2",
+        "What outcomes does the proposal seek?": "02:p4",
+        "Who is the applicant and which local partners are named?": "02:p2",
+    }
+    for question, required_unit in cases.items():
+        supplied = []
+
+        def respond(tier, system, user):
+            supplied.extend(item["unit_id"] for item in json.loads(user)["source_units"])
+            return json.dumps({"not_found": "retrieval-only evaluation", "evidence": []})
+
+        await ProposalAssistant(core, FakeLLM(respond)).chat_finding(question)
+        assert required_unit in supplied, (question, supplied)
+
+
 async def test_real_reviewer_corpus_excludes_every_other_budget_sheet(core):
     tool = ProposalAssistant(core)
     units = tool._units(("02", "06"))

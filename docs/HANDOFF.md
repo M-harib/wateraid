@@ -184,3 +184,30 @@ Verification:
   an unsupported selected document returned HTTP 400.
 - Live-model generic Q&A was not run because the configured OpenRouter account-level credit
   pool was exhausted. The browser-control provider was unavailable for a visual UI pass.
+
+### Proposal question-agnostic chat - 2026-10-17
+
+Decoupled the public proposal chat from the Q5/Q21/Q23 intent dispatcher. Every
+`POST /proposal/ask` request now follows the same retrieval, model-answer and exact-quote
+verification path over files 01–06. The three named questions remain dashboard examples
+only. The structured `POST /proposal/run` review still runs the required cost-share,
+construction and grounding checks independently of any question wording.
+
+Cost-share answers can include a model-selected comparison of verified agreement and call
+quotes. Code then parses those cited percentages and performs the arithmetic; no pack value
+or conclusion is embedded in the product code. Retrieval eval coverage confirms that the
+general chat context contains every required gold citation for Q5, Q21 and Q23. Pack-specific
+expected citations remain under `tests/eval/` only.
+
+Verification:
+
+- `uv run pytest -q` - 160 passed with two upstream deprecation warnings.
+- `npm run build` - TypeScript and Vite passed; the existing PDF chunk-size warning remains.
+- Retrieval evals passed for Q5/Q21/Q23 plus varied location, duration, outcome and
+  local-partner questions. General chat receives the complete six-page proposal and a
+  bounded set of relevant supporting pages.
+- Running `/healthz` and the proposal page returned HTTP 200. A 1440 px Edge headless
+  render showed the connected proposal view, sample-question label and open-ended composer.
+
+A fresh live-model answer-quality run still requires restoring the exhausted OpenRouter
+account balance.

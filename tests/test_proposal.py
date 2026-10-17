@@ -10,7 +10,7 @@ from tools.proposal import ProposalAssistant
 from tools.proposal.checklist import parse_row
 
 from tools.proposal.config import CHECKLIST_CATEGORIES, TABLE, dispatch
-from tools.proposal.evidence import InvalidOutput, cite_whole_unit, cited_percentage, grounding_candidate_hints, relevant_units, top_relevant_units, unit_id
+from tools.proposal.evidence import InvalidOutput, cite_whole_unit, cited_percentage, grounding_candidate_hints, grounding_focus_units, relevant_units, top_relevant_units, unit_id
 from tools.proposal.evidence import cite
 from tools.proposal.quality import numeric_quality
 
@@ -56,6 +56,14 @@ def test_top_relevant_units_ranks_across_documents():
              unit("03", "General agreement terms.")]
     selected = top_relevant_units(units, "Where is the delivery location?", limit=1)
     assert [unit_id(item) for item in selected] == ["02:p1"]
+
+
+def test_grounding_focus_prefers_substantiation_signals_without_pack_answers():
+    units = [unit("02", "Reach increased by 12%.", page=1),
+             unit("02", "Studies show attendance improved significantly by 8%.", page=2),
+             unit("04", "A neutral report section.", page=1)]
+    selected = grounding_focus_units(units)
+    assert [unit_id(item) for item in selected] == ["02:p2"]
 
 
 async def assistant(units, response):
@@ -270,6 +278,28 @@ async def test_generic_question_answers_from_verified_selected_sources():
     result = await tool.finding("Where will the project operate?", ["02"])
     assert result.status == Status.confirmed
     assert result.evidence[0].verified and result.evidence[0].ref.doc_id == "02"
+
+
+async def test_chat_sample_uses_generic_extraction_with_code_checked_comparison():
+    agreement = unit("03", "The applicant contributes at least 7% of eligible direct costs.")
+    call = unit("01", "Applicants contribute at least 12% of eligible direct costs.")
+
+    def response(tier, system, user):
+        payload = json.loads(user)
+        assert payload["task"] == "generic_qa"
+        return json.dumps({
+            "answer_status": "needs_review",
+            "answer": "The sources state different minimum contribution percentages.",
+            "evidence": [ev(agreement), ev(call)],
+            "comparison": {"kind": "cost_share", "agreement": ev(agreement), "call": ev(call)},
+        })
+
+    result = await (await assistant([agreement, call], response)).chat_finding(
+        "Please compare the applicant contribution requirements.", ["01", "03"])
+    assert result.topic == "generic_qa" and result.status == Status.conflict
+    assert result.computed.result["gap"] == 5
+    assert result.conflict.resolver.value == "gac"
+    assert all(item.verified for item in result.evidence)
 
 
 async def test_generic_question_abstains_without_claiming_full_document_absence():

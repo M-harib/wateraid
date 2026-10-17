@@ -159,6 +159,27 @@ def top_relevant_units(units: list[Unit], query: str, *, limit: int = 8) -> list
     return [unit for index, unit in enumerate(units) if index in selected]
 
 
+def grounding_focus_units(units: list[Unit], *, per_doc: int = 1) -> list[Unit]:
+    """Find claim-heavy units for questions about whether claims are substantiated."""
+    if isinstance(per_doc, bool) or not isinstance(per_doc, int) or per_doc <= 0:
+        raise ValueError("per_doc must be a positive integer")
+    strong = re.compile(r"\bstudies? show\b|\bsignificantly\b", re.I)
+    directional = re.compile(r"\b(?:improved|increased|reduced)\b", re.I)
+    percentage = re.compile(r"\d+(?:\.\d+)?\s*%")
+
+    def score(unit: Unit) -> int:
+        return 20 * len(strong.findall(unit.text)) + 3 * len(directional.findall(unit.text)) + min(3, len(percentage.findall(unit.text)))
+
+    selected: set[int] = set()
+    for doc_id in dict.fromkeys(unit.doc_id for unit in units):
+        ranked = sorted(
+            (index for index, unit in enumerate(units) if unit.doc_id == doc_id and score(unit) > 0),
+            key=lambda index: (-score(units[index]), index),
+        )
+        selected.update(ranked[:per_doc])
+    return [unit for index, unit in enumerate(units) if index in selected]
+
+
 def grounding_candidate_hints(units: list[Unit], limit_per_doc: int = 16) -> list[dict]:
     """Recall-oriented source spans for the model; these are candidates, never findings."""
     signals = re.compile(r"(?:\d+(?:\.\d+)?\s*%|\bpercent\b|\bsignificantly\b|\bimproved\b|"

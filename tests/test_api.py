@@ -114,6 +114,24 @@ def test_proposal_generic_question_accepts_selected_documents():
         assert {item["documentId"] for item in response.json()["evidence"]} == {"02"}
 
 
+def test_proposal_sample_wording_still_uses_general_chat():
+    def answer(tier, system, user):
+        payload = json.loads(user)
+        assert payload["task"] == "generic_qa"
+        source = next(item for item in payload["source_units"] if item["ref"]["doc_id"] == "02")
+        quote = source["text"].splitlines()[0]
+        return json.dumps({"answer_status": "answered", "answer": quote,
+                           "evidence": [{"unit_id": source["unit_id"], "quote": quote}],
+                           "comparison": None})
+
+    with TestClient(create_app(core=Core("assets"), llm=FakeLLM(answer))) as c:
+        response = c.post("/proposal/ask", json={
+            "question": "Does the agreement's minimum contribution meet the call's cost-share requirement?",
+        })
+        assert response.status_code == 200
+        assert response.json()["status"] == "answered"
+
+
 def test_proposal_generic_question_rejects_unknown_document():
     with _client(CONFIRMED) as c:
         response = c.post("/proposal/ask", json={"question": "Who is the applicant?", "documentIds": ["99"]})

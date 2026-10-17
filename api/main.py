@@ -105,7 +105,7 @@ def create_app(*, core: Core | None = None, llm=None) -> FastAPI:
         if not question:
             return JSONResponse({"detail": "question is required"}, status_code=400)
         try:
-            finding = await request.app.state.proposal.finding(question, body.documentIds)
+            finding = await request.app.state.proposal.chat_finding(question, body.documentIds)
         except ValueError as exc:
             return JSONResponse({"detail": str(exc)}, status_code=400)
         if finding.computed and finding.computed.result.get("error"):

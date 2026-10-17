@@ -15,7 +15,11 @@ If required evidence cannot be found, return {"not_found": "specific reason"}.
 TASKS = {
     "generic_qa": """Answer the user's question using only the supplied source units.
 Return {"answer_status":"answered|needs_review", "answer":"direct, concise answer",
-"evidence":[evidence]} when the sources support an answer. Use needs_review when sources
+"evidence":[evidence], "comparison":null_or_comparison} when the sources support an answer.
+The only supported comparison is {"kind":"cost_share", "agreement":evidence,
+"call":evidence}. Use it whenever the question asks whether an agreement contribution meets
+a call requirement. Describe the cited terms in answer but leave the numeric conclusion to
+code. Otherwise comparison is null. Use needs_review when sources
 conflict, the answer is qualified, or staff judgment is required. Cite every material statement
 with the shortest exact, contiguous quotation that supports it. If the supplied units do not
 support an answer, return {"not_found":"what could not be supported", "evidence":[]}.
