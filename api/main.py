@@ -1,7 +1,7 @@
 """FastAPI app exposing the three endpoints the frontend calls, with CORS.
 The web framework lives only here; core stays framework-agnostic.
 
-Run: uv run uvicorn api.main:app --reload   (point the FE at http://localhost:8000)
+Run: uv run python -m api.main   (serves on http://localhost:8010; set PORT to override)
 """
 from __future__ import annotations
 
@@ -75,3 +75,9 @@ def create_app(*, core: Core | None = None, llm=None) -> FastAPI:
 
 
 app = create_app()
+
+
+if __name__ == "__main__":
+    import uvicorn
+
+    uvicorn.run("api.main:app", port=int(os.getenv("PORT", "8010")), reload=True)
