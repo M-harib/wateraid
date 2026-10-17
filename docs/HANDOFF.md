@@ -135,3 +135,26 @@ now preserve a safe cause (`provider_rejected` or `provider_rate_limited`), and
 `POST /proposal/ask` returns HTTP 503 instead of wrapping the failure in a misleading
 HTTP 200 `needs_review` answer. `uv run pytest -q tests/test_api.py tests/test_proposal.py`
 passed 57 tests; a live Q5 request returned 503 with the credentials/credits guidance.
+
+### Proposal provider/context follow-up - 2026-10-17
+
+The backend reads the ignored repository-root `.env`. The configured OpenRouter key was
+authenticated successfully. Added configurable per-tier output caps and deterministic,
+per-document lexical page retrieval for the two focused comparisons. Every required
+document remains represented and every returned quote still passes the shared verifier.
+The whole-corpus unsupported-claims check remains exhaustive; it now sends bounded,
+sequential page batches and requires the combined result to account for every unit.
+
+Live `POST /proposal/ask` checks passed for Q5 and Q21. Q5 returned the 9.5% versus 10%
+conflict with three source excerpts; Q21 returned a conflict with six call/proposal/report
+excerpts. A fresh Q23 run could not complete because OpenRouter reported the account-level
+credit pool exhausted (`total_usage` slightly exceeded `total_credits`), even though the
+individual key remained valid. Provider failures continue to return HTTP 503 and remain
+retryable after the account is funded.
+
+Verification after these changes:
+
+- `uv run pytest -q tests/test_proposal.py tests/eval/test_proposal_pack.py tests/test_llm.py tests/test_api.py` - 74 passed.
+- `npm run build` - TypeScript and Vite passed; the existing PDF chunk-size warning remains.
+- The repository `.env` was normalized to assignment-only UTF-8 so `uv --env-file .env`
+  parses it without warnings; it remains ignored and was not added to Git.

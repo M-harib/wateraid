@@ -11,12 +11,13 @@ from core.checks import check_cost_share, score_urgency
 from core.checks.callmatch import Activity, CallRule, callmatch
 
 from .checklist import parse_row
-from .config import AS_OF, CHECKLIST_CATEGORIES, STARTUP_QUESTIONS, dispatch
-from .evidence import InvalidOutput, array, cite, cite_whole_unit, cited_percentage, context, fingerprint, grounding_candidate_hints, object_value, parse, text, unit_id
+from .config import AS_OF, CHECKLIST_CATEGORIES, CONTEXT_UNITS_PER_DOC, STARTUP_QUESTIONS, dispatch
+from .evidence import InvalidOutput, array, cite, cite_whole_unit, cited_percentage, context, fingerprint, grounding_candidate_hints, object_value, parse, relevant_units, text, unit_id
 from .prompts import SYSTEM, TASKS
 from .quality import numeric_quality
 
-PROMPT_VERSION = "proposal-v3"
+PROMPT_VERSION = "proposal-v4"
+GROUNDING_CONTEXT_CHARS = 12_000
 
 
 class ProposalAssistant:
@@ -48,10 +49,21 @@ class ProposalAssistant:
             raise RuntimeError("No model configured")
         groups = [units]
         if topic == "unsupported_claims":
-            # A single long-context pass repeatedly stopped after proposal 02. Independent
-            # passes make the search obligation explicit, then code combines the candidates.
-            groups = [[unit for unit in units if unit.doc_id == doc]
-                      for doc in sorted({unit.doc_id for unit in units})]
+            # Independent, bounded passes make the whole-corpus search obligation explicit
+            # without exceeding provider prompt limits. Code verifies that every supplied
+            # unit was reported as searched before accepting the combined judgment.
+            groups = []
+            for doc in sorted({unit.doc_id for unit in units}):
+                batch: list[Unit] = []
+                size = 0
+                for unit in (item for item in units if item.doc_id == doc):
+                    if batch and size + len(unit.text) > GROUNDING_CONTEXT_CHARS:
+                        groups.append(batch)
+                        batch, size = [], 0
+                    batch.append(unit)
+                    size += len(unit.text)
+                if batch:
+                    groups.append(batch)
 
         async def complete(group: list[Unit]) -> dict:
             group_extra = extra
@@ -77,6 +89,9 @@ class ProposalAssistant:
 
     async def _execute(self, topic: str, question: str, docs: tuple[str, ...], tier: str, builder, *, extra=None) -> Finding:
         units = self._units(docs)
+        if topic in CONTEXT_UNITS_PER_DOC:
+            retrieval_query = " ".join((question, topic.replace("_", " "), *self._intent_terms(topic)))
+            units = relevant_units(units, retrieval_query, per_doc=CONTEXT_UNITS_PER_DOC[topic])
         key = self._key(topic, units, question)
         async with self._locks.setdefault(key, asyncio.Lock()):
             cached = self.core.findings.by_key(key)
@@ -136,6 +151,12 @@ class ProposalAssistant:
             result = await run(tier, draft, max_escalations=0 if tier == "strong" else 1)
             await self.core.findings.add(result.finding)
             return result.finding
+
+    @staticmethod
+    def _intent_terms(topic: str) -> tuple[str, ...]:
+        # Kept local to the proposal dispatch policy so retrieval contains no pack facts.
+        from .config import KEYWORDS
+        return KEYWORDS.get(topic, ())
 
     async def finding(self, question: str) -> Finding:
         question = text(question, "question")

@@ -8,8 +8,9 @@ from core import Core, FakeLLM, SourceRef, Status, Unit
 from core.checks.callmatch import Activity, CallRule, callmatch
 from tools.proposal import ProposalAssistant
 from tools.proposal.checklist import parse_row
+
 from tools.proposal.config import CHECKLIST_CATEGORIES, TABLE, dispatch
-from tools.proposal.evidence import InvalidOutput, cite_whole_unit, cited_percentage, grounding_candidate_hints, unit_id
+from tools.proposal.evidence import InvalidOutput, cite_whole_unit, cited_percentage, grounding_candidate_hints, relevant_units, unit_id
 from tools.proposal.evidence import cite
 from tools.proposal.quality import numeric_quality
 
@@ -20,6 +21,33 @@ def unit(doc, content, page=1, sheet=None, cells=None):
 
 def ev(u, quote=None):
     return {"unit_id": unit_id(u), "quote": quote or u.text}
+
+
+def test_relevant_units_keeps_best_pages_from_every_requested_document():
+    units = [
+        unit("01", "General application instructions.", page=1),
+        unit("01", "The cost-share minimum contribution is described here.", page=2),
+        unit("01", "Unrelated eligibility detail.", page=3),
+        unit("03", "Agreement cover page.", page=1),
+        unit("03", "Applicant contribution toward eligible costs.", page=2),
+        unit("03", "Unrelated reporting clause.", page=3),
+    ]
+    selected = relevant_units(units, "cost share contribution", per_doc=1)
+    assert [unit_id(item) for item in selected] == ["01:p2", "03:p2"]
+
+
+def test_relevant_units_validates_limit_and_has_stable_zero_match_fallback():
+    units = [unit("01", "First page.", page=1), unit("01", "Second page.", page=2)]
+    assert [unit_id(item) for item in relevant_units(units, "no matching vocabulary", per_doc=1)] == ["01:p1"]
+    with pytest.raises(ValueError, match="positive integer"):
+        relevant_units(units, "anything", per_doc=0)
+
+
+def test_relevant_units_accepts_document_specific_limits():
+    units = [unit("01", "construction", page=1), unit("01", "construction", page=2),
+             unit("04", "construction", page=1), unit("04", "construction", page=2)]
+    selected = relevant_units(units, "construction", per_doc={"01": 1, "04": 2})
+    assert [unit_id(item) for item in selected] == ["01:p1", "04:p1", "04:p2"]
 
 
 async def assistant(units, response):
@@ -162,6 +190,28 @@ async def test_grounding_requires_candidates_from_both_documents():
     result = await (await assistant([a, b], response)).finding("unsupported claims")
     assert result.status == Status.needs_review and result.computed.result["error"]
     assert not result.evidence
+
+
+async def test_grounding_batches_large_documents_without_skipping_units():
+    units = [unit(doc, f"Claim improved without a measure {page}. " + "context " * 1700, page=page)
+             for doc in ("02", "04") for page in (1, 2, 3)]
+    calls = []
+
+    def response(tier, system, user):
+        payload = json.loads(user)
+        supplied = payload["source_units"]
+        calls.append(supplied)
+        first = supplied[0]
+        return json.dumps({
+            "claims": [{"evidence": {"unit_id": first["unit_id"], "quote": "Claim improved without a measure"},
+                        "reason": "No measurement identified.", "support": []}],
+            "searched_units": [item["unit_id"] for item in supplied],
+        })
+
+    result = await (await assistant(units, response)).finding("unsupported claims")
+    assert result.status == Status.needs_review
+    assert len(calls) == 6
+    assert {item["unit_id"] for call in calls for item in call} == {unit_id(item) for item in units}
 
 
 async def test_bad_quotes_are_not_cached_as_answers_and_can_recover():

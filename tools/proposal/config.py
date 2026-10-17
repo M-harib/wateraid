@@ -16,6 +16,12 @@ KEYWORDS = {
     "logic_model_quality": ("logic model", "indicator", "baseline", "target", "pmf"),
     "unsupported_claims": ("unsupported", "supporting evidence", "uncited", "claims"),
 }
+# Focused comparisons need only the most relevant pages from each required document.
+# Corpus-wide checks such as unsupported claims and the checklist intentionally remain exhaustive.
+CONTEXT_UNITS_PER_DOC = {
+    "cost_share_vs_call": 2,
+    "construction_vs_call": {"01": 1, "02": 1, "03": 1, "04": 2},
+}
 STARTUP_QUESTIONS = (
     "Does the agreement's minimum contribution meet the call's cost-share requirement?",
     "Which proposed or reported construction activities may conflict with the call?",
