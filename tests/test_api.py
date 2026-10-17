@@ -63,3 +63,22 @@ def test_fixtures_mode_returns_labelled_placeholder(monkeypatch):
         rows = c.get("/findings").json()
         assert rows[0]["title"].startswith("CONTRACT EXAMPLE")
         assert c.post("/ask", json={"question": "anything"}).json()["status"] == "not_found"
+
+
+def test_proposal_workspace_starts_empty_without_running_models():
+    with _client(CONFIRMED) as c:
+        body = c.get("/proposal").json()
+        assert body == {"findings": [], "checklist": [], "reviewerQuestions": [], "failures": []}
+
+
+def test_proposal_ask_abstains_for_known_absent_form():
+    with _client(CONFIRMED) as c:
+        response = c.post("/proposal/ask", json={"question": "Is the Local Partners form complete?"})
+        assert response.status_code == 200
+        assert response.json()["status"] == "not_found"
+        assert response.json()["evidence"] == []
+
+
+def test_proposal_ask_requires_question():
+    with _client(CONFIRMED) as c:
+        assert c.post("/proposal/ask", json={"question": " "}).status_code == 400
