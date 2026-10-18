@@ -29,10 +29,15 @@
 .documents-list strong { font-size: 12px; overflow-wrap: anywhere; }
 .documents-list small, .documents-list em { color: var(--muted); font-size: 10px; font-style: normal; }
 .documents-list em { color: var(--subtle); }
-.documents-file-actions { display: flex; flex-wrap: wrap; gap: 6px; }
-.documents-file-actions button { border: 1px solid var(--border); border-radius: 5px; background: var(--surface); color: var(--accent); padding: 7px; font-size: 10px; }
-.documents-file-actions button:hover { border-color: var(--accent); }
-.documents-file-actions button:disabled { color: var(--subtle); }
+.documents-file-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
+.documents-file-actions a, .documents-file-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 36px; min-width: 36px; border: 1px solid transparent; border-radius: 6px; padding: 0 16px; font-size: 12px; font-weight: 700; }
+/* Open = filled primary so the main action pops */
+.documents-file-actions a { background: var(--accent); border-color: var(--accent); color: var(--on-accent); box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 32%, transparent); }
+.documents-file-actions a:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+/* Delete = clearly destructive red (soft fill, solid on hover) */
+.documents-file-actions .doc-delete { padding: 0 11px; color: #d14343; border-color: color-mix(in srgb, #d14343 45%, var(--border)); background: color-mix(in srgb, #d14343 10%, var(--surface)); }
+.documents-file-actions .doc-delete:hover { background: #d14343; color: #fff; border-color: #d14343; }
+.documents-file-actions button:disabled { opacity: .5; }
 .documents-empty { padding: 50px 20px; text-align: center; color: var(--subtle); font-size: 12px; }
 .documents-side { padding: 23px; }
 .documents-side h2 { font-size: 17px; letter-spacing: -.03em; margin: 0 0 8px; }
@@ -43,5 +48,38 @@
 .documents-bundled strong, .documents-bundled small { display: block; font-size: 10px; }
 .documents-bundled small { color: var(--subtle); margin-top: 3px; }
 .documents-bundled svg { color: var(--accent); flex: none; }
+/* Project documents: folder list (projects) + document pane */
+.documents-breadcrumb { display: flex; align-items: center; gap: 8px; color: var(--muted); font-size: 12px; margin-bottom: 18px; }
+.documents-breadcrumb strong { color: var(--ink); font-size: 12px; }
+.documents-breadcrumb > svg { color: var(--subtle); }
+.documents-breadcrumb button { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--accent); padding: 7px 11px; font-size: 11px; font-weight: 700; }
+.documents-breadcrumb button:hover { border-color: var(--accent); }
+.documents-browser { display: grid; grid-template-columns: 252px minmax(0,1fr); gap: 16px; align-items: start; }
+.documents-folders { border: 1px solid var(--border); border-radius: 9px; background: var(--surface); padding: 10px; }
+.documents-folders-head { display: block; font: 800 11px ui-monospace, monospace; letter-spacing: .14em; color: var(--accent); padding: 8px 8px 11px; }
+.documents-new-project { width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; border: 1px solid var(--accent); border-radius: 7px; background: var(--accent); color: var(--on-accent); padding: 11px; font-size: 11px; font-weight: 700; margin-bottom: 10px; box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 35%, transparent); }
+.documents-new-project:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+.documents-folder { width: 100%; display: flex; align-items: center; gap: 10px; text-align: left; border: 0; background: none; border-radius: 7px; padding: 10px; color: var(--ink); }
+.documents-folder:hover { background: var(--accent-soft); }
+.documents-folder.active { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
+.documents-folder.active strong { color: var(--accent); }
+.documents-folder-icon { flex: none; color: var(--accent); display: grid; place-items: center; }
+.documents-folder > span:last-child { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.documents-folder strong { font-size: 12px; overflow-wrap: anywhere; }
+.documents-folder small { font-size: 10px; color: var(--muted); }
+.documents-pane { border: 1px solid var(--border); border-radius: 9px; background: var(--surface); min-width: 0; }
+.documents-pane-head { display: flex; justify-content: space-between; align-items: center; gap: 14px; padding: 16px 20px; border-bottom: 1px solid var(--border); }
+.documents-pane-head h2 { font-size: 18px; letter-spacing: -.03em; margin: 0; }
+.documents-pane-head small { color: var(--muted); font-size: 11px; }
+.documents-pane-head .solid-button { display: inline-flex; align-items: center; gap: 7px; height: 37px; white-space: nowrap; }
+.documents-pane .documents-list { border: 0; border-radius: 0; margin: 0; }
+.documents-empty-drop { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 12px; width: calc(100% - 28px); margin: 14px; padding: 48px 20px; text-align: center; color: var(--muted); font-size: 12px; border: 1px dashed var(--border); border-radius: 8px; background: none; }
+.documents-empty-drop:hover:not(:disabled) { border-color: var(--accent); background: var(--accent-soft); }
+.documents-empty-drop.dragging { border-color: var(--accent); background: var(--accent-soft); }
+.documents-empty-drop:disabled { opacity: .6; }
+.documents-empty-drop > svg { color: var(--accent); }
+.documents-empty-drop p { margin: 0; }
+.documents-drop-hint { padding: 10px 20px; color: var(--accent); font-size: 11px; font-weight: 700; border-top: 1px dashed var(--accent); }
+@media (max-width: 860px) { .documents-browser { grid-template-columns: 1fr; } }
 @media (max-width: 1050px) { .documents-grid { grid-template-columns: 1fr; } }
 @media (max-width: 680px) { .dashboard-intake { padding: 24px 15px 60px; } .documents-heading { align-items: start; flex-direction: column; } .documents-drop { padding: 25px 14px; } .documents-drop > div { flex-wrap: wrap; } .documents-list article { align-items: start; flex-wrap: wrap; } .documents-file-actions { width: 100%; margin-left: 46px; } }

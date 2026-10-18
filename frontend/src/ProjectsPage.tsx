@@ -4,9 +4,10 @@ import { BrandMark } from './Brand'
 import { ThemeToggle } from './components/ThemeToggle'
 import { DraftWorkspace } from './components/DraftWorkspace'
 import { ProjectDocuments } from './components/ProjectDocuments'
-import { loadDraft, removeDraft } from './draft'
-import { deleteProjectDocuments, listLocalDocuments } from './localDocuments'
-import { createLocalProject, loadLocalProjects, saveLocalProjects, type LocalProject } from './projects'
+import { removeDraft } from './draft'
+import { deleteProjectDocuments } from './localDocuments'
+import { demoProjectId, loadLocalProjects, saveLocalProjects, type LocalProject } from './projects'
+import { createProject, loadProjects, type ProjectSummary } from './api'
 import type { Theme } from './theme'
 
 type Props = { projectId?: string; projectSection?: 'intake' | 'draft'; onHome: () => void; onOpenDemo: () => void; onOpenProject: (id: string, section?: 'intake' | 'draft') => void; onProjects: () => void; theme: Theme; onToggleTheme: () => void }
@@ -17,30 +18,31 @@ export function ProjectsPage({ projectId, projectSection, onHome, onOpenDemo, on
   const [name, setName] = useState('')
   const [organization, setOrganization] = useState('')
   const [error, setError] = useState('')
-  const [documentCounts, setDocumentCounts] = useState<Record<string, number>>({})
+  const [backendProjects, setBackendProjects] = useState<ProjectSummary[]>([])
   const project = projects.find((item) => item.id === projectId)
 
   useEffect(() => {
     let active = true
-    Promise.all(projects.map(async (item) => [item.id, (await listLocalDocuments(item.id)).length] as const))
-      .then((counts) => { if (active) setDocumentCounts(Object.fromEntries(counts)) })
-      .catch(() => { /* Draft counts remain as a local fallback. */ })
+    loadProjects().then((list) => { if (active) setBackendProjects(list) }).catch(() => { /* list stays empty */ })
     return () => { active = false }
-  }, [projects, projectId])
+  }, [])
 
-  function addProject(event: React.FormEvent) {
+  function openWorkspace(id: string) {
+    try { window.localStorage.setItem('grantguard.project', id) } catch { /* selection just won't persist */ }
+    onOpenDemo()
+  }
+
+  async function addProject(event: React.FormEvent) {
     event.preventDefault()
     if (!name.trim()) { setError('Enter a project name.'); return }
-    if (projects.some((item) => item.name.toLowerCase() === name.trim().toLowerCase())) { setError('A project with this name already exists in this browser.'); return }
     try {
-      const next = createLocalProject(name, organization)
-      setProjects(saveLocalProjects([...projects, next]))
+      const created = await createProject(name.trim())
       setName('')
       setOrganization('')
       setError('')
       setCreating(false)
-      onOpenProject(next.id)
-    } catch { setError('Could not save this project. Check the name or browser storage.') }
+      openWorkspace(created.projectId)
+    } catch (e) { setError(e instanceof Error ? e.message : 'Could not create this project.') }
   }
 
   async function removeProject() {
@@ -64,10 +66,9 @@ export function ProjectsPage({ projectId, projectSection, onHome, onOpenDemo, on
         {projectSection === 'draft' ? <DraftWorkspace projectId={project.id} projectName={project.name} onOpenIntake={() => onOpenProject(project.id, 'intake')} /> : <ProjectDocuments projectId={project.id} projectName={project.name} onGoDraft={() => onOpenProject(project.id, 'draft')} />}
       </> : <div className="project-empty"><h1>Project not found</h1><p>This project may have been removed or was created in a different browser.</p><button className="solid-button" type="button" onClick={onProjects}>All projects <ArrowRight size={16} /></button></div> : <>
         <div className="projects-heading"><div><span className="dashboard-eyebrow">YOUR WORKSPACE</span><h1>Projects</h1><p>Keep each grant application and its evidence in its own place.</p></div><button className="solid-button" type="button" onClick={() => { setCreating(true); setError('') }}><Plus size={17} /> New project</button></div>
-        <div className="projects-note"><FolderOpen size={19} /><span>Open the demo case to edit a proposal beside cited analysis, or create a separate project with a local draft and file intake.</span></div>
+        <div className="projects-note"><FolderOpen size={19} /><span>Each project keeps its own uploaded documents and evidence workspace. Open one to work on it.</span></div>
         <div className="projects-grid">
-          <button className="project-card project-card-demo" type="button" onClick={onOpenDemo}><span className="project-card-top"><span className="project-card-icon"><FileText size={21} /></span><span className="project-card-badge">DEMO CASE</span></span><strong>Taps for Rights</strong><span>Water Care · synthetic challenge case</span><div><span>7 source files</span><span>Evidence workspace ready</span></div><span className="project-card-open">Open workspace <ArrowUpRight size={16} /></span></button>
-          {projects.map((item) => { const sourceCount = documentCounts[item.id] ?? loadDraft(item.id, item.name).sources.length; return <button className="project-card" type="button" key={item.id} onClick={() => onOpenProject(item.id)}><span className="project-card-top"><span className="project-card-icon"><FolderOpen size={21} /></span><span className="project-card-badge muted">{sourceCount ? 'IN PROGRESS' : 'SETUP'}</span></span><strong>{item.name}</strong><span>{item.organization || 'Organization not specified'}</span><div><span>{sourceCount} uploaded {sourceCount === 1 ? 'file' : 'files'}</span><span>Browser local</span></div><span className="project-card-open">Open project <ArrowUpRight size={16} /></span></button> })}
+          {backendProjects.map((item) => { const demo = item.projectId === demoProjectId; return <button className={`project-card ${demo ? 'project-card-demo' : ''}`} type="button" key={item.projectId} onClick={() => openWorkspace(item.projectId)}><span className="project-card-top"><span className="project-card-icon">{demo ? <FileText size={21} /> : <FolderOpen size={21} />}</span><span className={`project-card-badge ${demo ? '' : 'muted'}`}>{demo ? 'DEMO CASE' : `${item.documentCount} ${item.documentCount === 1 ? 'DOC' : 'DOCS'}`}</span></span><strong>{item.name}</strong><span>{item.documentCount} source {item.documentCount === 1 ? 'file' : 'files'}</span><div><span>Evidence workspace</span><span>{item.ready ? 'Ready' : 'In progress'}</span></div><span className="project-card-open">Open workspace <ArrowUpRight size={16} /></span></button> })}
           <button className="project-card project-card-add" type="button" onClick={() => { setCreating(true); setError('') }}><Plus size={23} /><strong>Add another project</strong><span>Start a separate grant folder</span></button>
         </div>
       </>}

@@ -23,6 +23,11 @@ class UnitStore:
                 self._by_doc.setdefault(u.doc_id, []).append(u)
                 self._by_ref[_key(u.ref)] = u
 
+    async def remove_doc(self, doc_id: str) -> None:
+        async with self._lock:
+            for unit in self._by_doc.pop(doc_id, []):
+                self._by_ref.pop(_key(unit.ref), None)
+
     def by_doc(self, doc_id: str) -> list[Unit]:
         return list(self._by_doc.get(doc_id, []))
 

@@ -8,7 +8,7 @@ export type DashboardConnection =
 
 const FindingListSchema = z.union([z.array(FindingSchema), z.object({ findings: z.array(FindingSchema) })])
 const RequirementListSchema = z.union([z.array(RequirementSchema), z.object({ obligations: z.array(RequirementSchema) })])
-const AnswerEvidenceSchema = z.object({ documentId: z.enum(['00', '01', '02', '03', '04', '05', '06']), locator: z.object({ page: z.number().int().positive().optional(), section: z.string().optional(), sheet: z.string().optional(), cells: z.string().optional() }), excerpt: z.string().optional() })
+const AnswerEvidenceSchema = z.object({ documentId: z.string().min(1), locator: z.object({ page: z.number().int().positive().optional(), section: z.string().optional(), sheet: z.string().optional(), cells: z.string().optional() }), excerpt: z.string().optional() })
 const AnswerSchema = z.object({
   answer: z.string().min(1),
   status: z.enum(['answered', 'conflict', 'not_found', 'needs_review']),
@@ -174,4 +174,82 @@ export async function askProposalQuestion(question: string, documentIds?: string
   const parsed = AnswerSchema.safeParse(body)
   if (!parsed.success) throw new Error('Proposal answer did not match the dashboard schema')
   return parsed.data
+}
+
+// --- projects ---
+
+const ProjectSummarySchema = z.object({
+  projectId: z.string().min(1),
+  name: z.string().min(1),
+  documentCount: z.number().int().nonnegative(),
+  ready: z.boolean(),
+})
+export type ProjectSummary = z.infer<typeof ProjectSummarySchema>
+
+export async function loadProjects(): Promise<ProjectSummary[]> {
+  const body = await requestJson('/projects', {}, 20_000)
+  const parsed = z.object({ projects: z.array(ProjectSummarySchema) }).safeParse(body)
+  if (!parsed.success) throw new Error('Projects response did not match the dashboard schema')
+  return parsed.data.projects
+}
+
+export async function createProject(name: string): Promise<ProjectSummary> {
+  const body = await requestJson('/projects', {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }),
+  }, 20_000)
+  const parsed = z.object({ projectId: z.string().min(1), name: z.string().min(1) }).safeParse(body)
+  if (!parsed.success) throw new Error('Create-project response did not match the dashboard schema')
+  return { ...parsed.data, documentCount: 0, ready: false }
+}
+
+// --- per-project uploaded documents (backend ingestion) ---
+
+const ProjectDocumentSchema = z.object({
+  doc_id: z.string().min(1),
+  filename: z.string().min(1),
+  kind: z.enum(['pdf', 'excel', 'csv']),
+  status: z.enum(['queued', 'ingesting', 'ready', 'failed']),
+  error: z.string().nullable(),
+  unit_count: z.number().int().nonnegative(),
+  uploaded_at: z.string(),
+})
+const ProjectDocumentsSchema = z.object({
+  projectId: z.string().min(1),
+  documents: z.array(ProjectDocumentSchema),
+  ready: z.boolean(),
+})
+export type ProjectDocument = z.infer<typeof ProjectDocumentSchema>
+export type ProjectDocuments = z.infer<typeof ProjectDocumentsSchema>
+
+function parseProjectDocuments(body: unknown): ProjectDocuments {
+  const parsed = ProjectDocumentsSchema.safeParse(body)
+  if (!parsed.success) throw new Error('Documents response did not match the dashboard schema')
+  return parsed.data
+}
+
+export async function loadProjectDocuments(projectId: string): Promise<ProjectDocuments> {
+  return parseProjectDocuments(await requestJson(`/projects/${encodeURIComponent(projectId)}/documents`, {}, 20_000))
+}
+
+export async function uploadProjectDocuments(projectId: string, files: File[]): Promise<ProjectDocuments> {
+  const form = new FormData()
+  for (const file of files) form.append('files', file)
+  return parseProjectDocuments(await requestJson(`/projects/${encodeURIComponent(projectId)}/documents`, { method: 'POST', body: form }, 120_000))
+}
+
+export async function deleteProjectDocument(projectId: string, docId: string): Promise<void> {
+  await requestJson(`/projects/${encodeURIComponent(projectId)}/documents/${encodeURIComponent(docId)}`, { method: 'DELETE' }, 20_000)
+}
+
+export async function askProjectQuestion(projectId: string, question: string): Promise<AskAnswer> {
+  const body = await requestJson(`/projects/${encodeURIComponent(projectId)}/ask`, {
+    method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ question }),
+  }, 150_000)
+  const parsed = AnswerSchema.safeParse(body)
+  if (!parsed.success) throw new Error('Answer did not match the dashboard schema')
+  return parsed.data
+}
+
+export function projectDocumentFileUrl(projectId: string, docId: string): string {
+  return `${apiBase()}/projects/${encodeURIComponent(projectId)}/documents/${encodeURIComponent(docId)}/file`
 }
