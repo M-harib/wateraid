@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { AlertCircle, CheckCircle2, FileSpreadsheet, FileText, Loader, Trash2, Upload } from 'lucide-react'
+import { AlertCircle, CheckCircle2, ChevronRight, FileSpreadsheet, FileText, Folder, FolderOpen, Loader, Plus, Trash2, Upload } from 'lucide-react'
 import {
   deleteProjectDocument,
   loadProjectDocuments,
@@ -37,6 +37,7 @@ export function BackendDocuments({ projectId, projectName, projects, onSelectPro
   useEffect(() => {
     if (!connected) return
     let active = true
+    setDocs([]); setError(''); setNotice('')
     loadProjectDocuments(projectId)
       .then((r) => { if (active) setDocs(r.documents) })
       .catch((e) => { if (active) setError(e instanceof Error ? e.message : 'Could not load documents.') })
@@ -71,30 +72,48 @@ export function BackendDocuments({ projectId, projectName, projects, onSelectPro
   }
 
   return <div className="project-documents">
-    <div className="documents-heading"><div><span className="dashboard-eyebrow">PROJECT UPLOAD / {projectName.toUpperCase()}</span><h1>Upload documents</h1><p>Upload PDFs, spreadsheets, or CSVs to this project. They are ingested in the background; once ready they are searchable from the evidence workspace.</p></div><div className="workspace-project-select"><label htmlFor="upload-project">Project</label><select id="upload-project" value={projectId} onChange={(event) => { if (event.target.value === '__new__') onNewProject(); else onSelectProject(event.target.value) }}>{projects.map((item) => <option key={item.projectId} value={item.projectId}>{item.name} ({item.documentCount})</option>)}<option value="__new__">+ New project…</option></select></div></div>
+    <nav className="documents-breadcrumb">
+      <span>Projects</span><ChevronRight size={15} /><strong>{projectName}</strong>
+      <button type="button" onClick={onNewProject}><Plus size={15} /> New project</button>
+    </nav>
     {!connected && <div className="inline-error" role="alert">Connect the analysis service (set VITE_API_BASE_URL) to upload documents.</div>}
     {(error || notice) && <div className={error ? 'inline-error' : 'draft-notice'} role={error ? 'alert' : 'status'}>{error || notice}</div>}
 
-    <div className={`documents-drop ${dragging ? 'dragging' : ''}`}
-      onDragOver={(e) => { e.preventDefault(); if (connected) setDragging(true) }}
-      onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragging(false) }}
-      onDrop={(e) => { e.preventDefault(); if (connected) void onFiles(e.dataTransfer.files) }}>
-      <Upload size={24} />
-      <h2>Upload source documents</h2>
-      <p>Drop files here or choose them. PDF, XLSX/XLS, CSV.</p>
-      <button type="button" className="solid-button" disabled={!connected || uploading} onClick={() => inputRef.current?.click()}>{uploading ? 'Uploading…' : 'Choose files'}</button>
-      <input ref={inputRef} hidden type="file" multiple accept={ACCEPT} onChange={(e) => void onFiles(e.target.files ?? [])} />
-    </div>
+    <div className="documents-browser">
+      <aside className="documents-folders">
+        <span className="documents-folders-head">PROJECTS</span>
+        {projects.map((item) => {
+          const active = item.projectId === projectId
+          return <button type="button" key={item.projectId} className={`documents-folder ${active ? 'active' : ''}`} onClick={() => onSelectProject(item.projectId)}>
+            <span className="documents-folder-icon">{active ? <FolderOpen size={18} /> : <Folder size={18} />}</span>
+            <span><strong>{item.name}</strong><small>{item.documentCount} document{item.documentCount === 1 ? '' : 's'}</small></span>
+          </button>
+        })}
+        {projects.length === 0 && <p className="no-results">No projects yet.</p>}
+      </aside>
 
-    {docs.length > 0 && <div className="documents-list"><div className="documents-list-head"><strong>Documents</strong><span>{docs.length}</span></div>
-      {docs.map((doc) => <article key={doc.doc_id}>
-        <span className="documents-file-icon">{doc.kind === 'pdf' ? <FileText size={18} /> : <FileSpreadsheet size={18} />}</span>
-        <div><strong>{doc.filename}</strong><small><StatusBadge doc={doc} /></small></div>
-        <div className="documents-file-actions">
-          {doc.status === 'ready' && <a href={projectDocumentFileUrl(projectId, doc.doc_id)} target="_blank" rel="noreferrer">Open</a>}
-          <button type="button" onClick={() => void remove(doc.doc_id)} aria-label={`Remove ${doc.filename}`}><Trash2 size={15} /></button>
+      <section className="documents-pane"
+        onDragOver={(e) => { e.preventDefault(); if (connected) setDragging(true) }}
+        onDragLeave={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragging(false) }}
+        onDrop={(e) => { e.preventDefault(); if (connected) void onFiles(e.dataTransfer.files) }}>
+        <div className="documents-pane-head">
+          <div><h2>{projectName}</h2><small>{docs.length} document{docs.length === 1 ? '' : 's'}</small></div>
+          <button type="button" className="solid-button" disabled={!connected || uploading} onClick={() => inputRef.current?.click()}><Upload size={16} /> {uploading ? 'Uploading…' : 'Add documents'}</button>
         </div>
-      </article>)}
-    </div>}
+        <input ref={inputRef} hidden type="file" multiple accept={ACCEPT} onChange={(e) => void onFiles(e.target.files ?? [])} />
+
+        {docs.length > 0
+          ? <div className="documents-list">{docs.map((doc) => <article key={doc.doc_id}>
+              <span className="documents-file-icon">{doc.kind === 'pdf' ? <FileText size={18} /> : <FileSpreadsheet size={18} />}</span>
+              <div><strong>{doc.filename}</strong><small><StatusBadge doc={doc} /></small></div>
+              <div className="documents-file-actions">
+                {doc.status === 'ready' && <a href={projectDocumentFileUrl(projectId, doc.doc_id)} target="_blank" rel="noreferrer">Open</a>}
+                <button type="button" onClick={() => void remove(doc.doc_id)} aria-label={`Remove ${doc.filename}`}><Trash2 size={15} /></button>
+              </div>
+            </article>)}</div>
+          : <div className={`documents-empty-drop ${dragging ? 'dragging' : ''}`}><Upload size={24} /><p>Drop PDF, XLSX/XLS, or CSV files here, or use <strong>Add documents</strong>.</p></div>}
+        {dragging && docs.length > 0 && <div className="documents-drop-hint">Drop to upload to {projectName}</div>}
+      </section>
+    </div>
   </div>
 }
