@@ -24,6 +24,7 @@ export function PdfPreview({ title, url, page, highlight }: Props) {
   const [blobUrl, setBlobUrl] = useState<string>()
   const [loadError, setLoadError] = useState('')
   const scrolledRef = useRef('')
+  const pageScrolledRef = useRef('')
 
   useEffect(() => {
     const element = containerRef.current
@@ -39,7 +40,7 @@ export function PdfPreview({ title, url, page, highlight }: Props) {
   useEffect(() => {
     let active = true
     let created: string | undefined
-    setBlobUrl(undefined); setLoadError(''); setNumPages(undefined); setZoom(1); scrolledRef.current = ''
+    setBlobUrl(undefined); setLoadError(''); setNumPages(undefined); setZoom(1); scrolledRef.current = ''; pageScrolledRef.current = ''
     fetch(url, { cache: 'no-store' })
       .then((response) => { if (!response.ok) throw new Error(`The document service returned ${response.status}.`); return response.blob() })
       .then((blob) => { if (!active) return; created = URL.createObjectURL(blob); setBlobUrl(created) })
@@ -47,7 +48,7 @@ export function PdfPreview({ title, url, page, highlight }: Props) {
     return () => { active = false; if (created) URL.revokeObjectURL(created) }
   }, [url])
 
-  useEffect(() => { scrolledRef.current = '' }, [page, highlight])
+  useEffect(() => { scrolledRef.current = ''; pageScrolledRef.current = '' }, [page, highlight])
 
   const target = highlight ? norm(highlight) : ''
   const scrollKey = `${page ?? ''}|${highlight ?? ''}`
@@ -62,14 +63,14 @@ export function PdfPreview({ title, url, page, highlight }: Props) {
       }
     : undefined
 
-  // Jump to a cited page once it is known (no excerpt to anchor on).
+  // Jump to the cited page once it is known.
   useEffect(() => {
-    if (!numPages || !page || highlight || scrolledRef.current === scrollKey) return
+    if (!numPages || !page || pageScrolledRef.current === scrollKey) return
     containerRef.current?.querySelector(`#pdf-page-${page}`)?.scrollIntoView({ block: 'start' })
-    scrolledRef.current = scrollKey
-  }, [numPages, page, highlight, scrollKey])
+    pageScrolledRef.current = scrollKey
+  }, [numPages, page, scrollKey])
 
-  // Once a highlighted page's text renders, scroll the first match into view.
+  // Once the cited page's text renders, center the highlighted excerpt within it.
   const anchorHighlight = () => {
     if (!highlight || scrolledRef.current === scrollKey) return
     const mark = containerRef.current?.querySelector('mark.pdf-mark')
@@ -97,7 +98,7 @@ export function PdfPreview({ title, url, page, highlight }: Props) {
                       width={Math.round(width * zoom)}
                       renderTextLayer
                       renderAnnotationLayer={false}
-                      customTextRenderer={textRenderer}
+                      customTextRenderer={!page || page === index + 1 ? textRenderer : undefined}
                       onRenderTextLayerSuccess={anchorHighlight}
                       loading={<div className="pdf-message">Rendering page…</div>}
                     />
