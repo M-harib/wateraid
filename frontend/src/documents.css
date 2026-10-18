@@ -30,11 +30,14 @@
 .documents-list small, .documents-list em { color: var(--muted); font-size: 10px; font-style: normal; }
 .documents-list em { color: var(--subtle); }
 .documents-file-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
-.documents-file-actions a, .documents-file-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 36px; min-width: 36px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--accent); padding: 0 15px; font-size: 12px; font-weight: 600; }
-.documents-file-actions a:hover { border-color: var(--accent); background: var(--accent-soft); }
-.documents-file-actions .doc-delete { color: var(--muted); padding: 0 11px; }
-.documents-file-actions .doc-delete:hover { border-color: #d14343; color: #d14343; background: color-mix(in srgb, #d14343 10%, transparent); }
-.documents-file-actions button:disabled { color: var(--subtle); }
+.documents-file-actions a, .documents-file-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 36px; min-width: 36px; border: 1px solid transparent; border-radius: 6px; padding: 0 16px; font-size: 12px; font-weight: 700; }
+/* Open = filled primary so the main action pops */
+.documents-file-actions a { background: var(--accent); border-color: var(--accent); color: var(--on-accent); box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 32%, transparent); }
+.documents-file-actions a:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+/* Delete = clearly destructive red (soft fill, solid on hover) */
+.documents-file-actions .doc-delete { padding: 0 11px; color: #d14343; border-color: color-mix(in srgb, #d14343 45%, var(--border)); background: color-mix(in srgb, #d14343 10%, var(--surface)); }
+.documents-file-actions .doc-delete:hover { background: #d14343; color: #fff; border-color: #d14343; }
+.documents-file-actions button:disabled { opacity: .5; }
 .documents-empty { padding: 50px 20px; text-align: center; color: var(--subtle); font-size: 12px; }
 .documents-side { padding: 23px; }
 .documents-side h2 { font-size: 17px; letter-spacing: -.03em; margin: 0 0 8px; }
