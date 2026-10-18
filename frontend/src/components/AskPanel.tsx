@@ -11,7 +11,7 @@ type Props = {
   error: string
   asking: boolean
   connected: boolean
-  onClose: () => void
+  onClose?: () => void
   onCitation: (documentId: string, page?: number, excerpt?: string) => void
   resolveName?: (id: string) => string | undefined
   scope?: string
@@ -20,7 +20,7 @@ type Props = {
 
 export function AskPanel({ question, onQuestion, onSubmit, answer, error, asking, connected, onClose, onCitation, resolveName, scope, showGuide = true }: Props) {
   return <aside className="workspace-assistant" aria-label="Ask the documents">
-    <div className="assistant-head"><span className="assistant-icon"><MessageSquareText size={18} /></span><div><strong>Ask the documents</strong><small>{scope ?? 'All Taps for Rights sources'}</small></div><button type="button" onClick={onClose} aria-label="Close assistant"><X size={18} /></button></div>
+    <div className="assistant-head"><span className="assistant-icon"><MessageSquareText size={18} /></span><div><strong>Ask the documents</strong><small>{scope ?? 'All Taps for Rights sources'}</small></div>{onClose && <button type="button" onClick={onClose} aria-label="Close assistant"><X size={18} /></button>}</div>
     <div className="assistant-content">
       {!answer && !error && <div className="assistant-intro"><span className="dashboard-eyebrow">SOURCE-GROUNDED Q&A</span><h2>Ask while you read.</h2><p>Answers appear here with source links. Open a citation to inspect the original document in the center.</p></div>}
       {error && <div className="inline-error" role="alert">{error}</div>}
