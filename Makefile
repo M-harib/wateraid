@@ -19,7 +19,7 @@ help:
 	@echo "make fe       - run frontend in the foreground (HMR)"
 
 install:
-	uv sync
+	cd backend && uv sync
 	cd frontend && npm install
 
 up:
@@ -27,7 +27,7 @@ up:
 	if lsof -ti:$(BE_PORT) -sTCP:LISTEN >/dev/null 2>&1; then
 	  echo "backend already running on :$(BE_PORT)"
 	else
-	  setsid uv run uvicorn api.main:app --host 127.0.0.1 --port $(BE_PORT) >"$(RUN)/be.log" 2>&1 </dev/null &
+	  ( cd "$(CURDIR)/backend" && setsid uv run uvicorn api.main:app --host 127.0.0.1 --port $(BE_PORT) >"$(RUN)/be.log" 2>&1 </dev/null & )
 	  echo "backend  -> http://localhost:$(BE_PORT)  (log: .run/be.log)"
 	fi
 	if lsof -ti:$(FE_PORT) -sTCP:LISTEN >/dev/null 2>&1; then
@@ -47,7 +47,7 @@ restart:
 	$(MAKE) up
 
 be:
-	uv run uvicorn api.main:app --host 127.0.0.1 --port $(BE_PORT) --reload
+	cd backend && uv run uvicorn api.main:app --host 127.0.0.1 --port $(BE_PORT) --reload
 
 fe:
 	cd frontend && npm run dev

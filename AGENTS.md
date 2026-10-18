@@ -1,5 +1,9 @@
 # AGENTS.md
 
+## Repository layout
+
+The Python app lives in `backend/` (`api/`, `core/`, `tools/`, `tests/`, `pyproject.toml`, and the source pack in `backend/assets/`); the UI lives in `frontend/`. Run backend commands from `backend/` (`cd backend && uv run pytest`, `uv run uvicorn api.main:app ...`) or use the root `Makefile` (`make install/up/be`). Paths like `assets/…` below are relative to `backend/`.
+
 ## What we are building
 
 **GrantGuard** is a one-day prototype for WaterAid Canada Challenge A6. The supplied hackathon case is a **fictional Water Care** project called *Taps for Rights*; do not describe its facts as real WaterAid activity. The goal is to help grant staff see requirements, reported results, conflicts, and due dates with evidence they can inspect. The assistant flags issues; staff make decisions.

@@ -1,10 +1,10 @@
-import guideUrl from '../../assets/00_Start_Here_A6_Taps_for_Rights.pdf?url'
-import callUrl from '../../assets/01_Funding_Call_GAC_2018.pdf?url'
-import proposalUrl from '../../assets/02_Preliminary_Proposal_Taps_for_Rights.pdf?url'
-import agreementUrl from '../../assets/03_Contribution_Agreement_Taps_for_Rights.pdf?url'
-import reportUrl from '../../assets/04_Year3_Results_Report_Taps_for_Rights.pdf?url'
-import pmfUrl from '../../assets/05_Logic_Model_and_PMF_Taps_for_Rights.xlsx?url'
-import budgetUrl from '../../assets/06_Budget_Template_Taps_for_Rights.xlsx?url'
+import guideUrl from '../../backend/assets/00_Start_Here_A6_Taps_for_Rights.pdf?url'
+import callUrl from '../../backend/assets/01_Funding_Call_GAC_2018.pdf?url'
+import proposalUrl from '../../backend/assets/02_Preliminary_Proposal_Taps_for_Rights.pdf?url'
+import agreementUrl from '../../backend/assets/03_Contribution_Agreement_Taps_for_Rights.pdf?url'
+import reportUrl from '../../backend/assets/04_Year3_Results_Report_Taps_for_Rights.pdf?url'
+import pmfUrl from '../../backend/assets/05_Logic_Model_and_PMF_Taps_for_Rights.xlsx?url'
+import budgetUrl from '../../backend/assets/06_Budget_Template_Taps_for_Rights.xlsx?url'
 
 export type SourceDocument = {
   id: string
