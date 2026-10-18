@@ -3,6 +3,7 @@ import { ArrowLeft, ArrowRight, ArrowUpRight, BookOpenText, CalendarDays, CheckC
 import { askProjectQuestion, askProposalQuestion, createProject, loadDashboard, loadProjectDocuments, loadProjects, loadProposalRunStatus, loadProposalWorkspace, projectDocumentFileUrl, runProposalChecks, type AskAnswer, type DashboardConnection, type ProjectDocument, type ProjectSummary, type ProposalRunStatus } from './api'
 import { BrandMark } from './Brand'
 import { ReviewDialog } from './components/ReviewDialog'
+import { NewProjectDialog } from './components/NewProjectDialog'
 import { AskPanel } from './components/AskPanel'
 import { ThemeToggle } from './components/ThemeToggle'
 import { DraftWorkspace } from './components/DraftWorkspace'
@@ -97,6 +98,7 @@ export function Dashboard({ section, onNavigate, onExit, onProjects, theme, onTo
   const [uploadedDocs, setUploadedDocs] = useState<ProjectDocument[]>([])
   const [projects, setProjects] = useState<ProjectSummary[]>([])
   const [projectId, setProjectId] = useState('taps-for-rights')
+  const [newProjectOpen, setNewProjectOpen] = useState(false)
   const [proposal, setProposal] = useState<ProposalWorkspace>(emptyProposalWorkspace)
   const [proposalAvailable, setProposalAvailable] = useState(false)
   const [proposalLoading, setProposalLoading] = useState(false)
@@ -218,15 +220,12 @@ export function Dashboard({ section, onNavigate, onExit, onProjects, theme, onTo
     setAnswer(null)
   }
 
-  async function addProject() {
-    const name = window.prompt('New project name')?.trim()
-    if (!name) return
-    try {
-      const created = await createProject(name)
-      setProjects((list) => (list.some((p) => p.projectId === created.projectId) ? list : [...list, created]))
-      changeProject(created.projectId)
-      navigate('intake')
-    } catch (error) { setNotice(error instanceof Error ? error.message : 'Could not create the project.') }
+  async function submitNewProject(name: string) {
+    const created = await createProject(name)
+    setProjects((list) => (list.some((p) => p.projectId === created.projectId) ? list : [...list, created]))
+    setNewProjectOpen(false)
+    changeProject(created.projectId)
+    navigate('intake')
   }
 
   function openAssistant() {
@@ -347,7 +346,7 @@ export function Dashboard({ section, onNavigate, onExit, onProjects, theme, onTo
       <header className="dashboard-topbar"><button className="dashboard-mobile-menu" type="button" onClick={() => setMobileNav(true)} aria-label="Open navigation"><Menu size={21} /></button><span className="dashboard-crumb">Workspace <ChevronRight size={15} /> <strong>{nav.find((item) => item.section === section)?.title}</strong></span><div className="dashboard-topbar-actions"><span className={`service-state ${connection.mode === 'connected' ? 'connected' : ''}`}><i /> {connection.mode === 'connected' ? 'Analysis connected' : connection.mode === 'unavailable' ? 'Service unavailable' : 'Source pack preview'}</span><ThemeToggle theme={theme} onToggle={onToggleTheme} /></div></header>
 
       <main className={`dashboard-main dashboard-${section}`}>
-        {section === 'intake' && <BackendDocuments projectId={projectId} projectName={projectName} projects={projects} onSelectProject={changeProject} onNewProject={addProject} connected={connection.mode === 'connected'} />}
+        {section === 'intake' && <BackendDocuments projectId={projectId} projectName={projectName} projects={projects} onSelectProject={changeProject} onNewProject={() => setNewProjectOpen(true)} connected={connection.mode === 'connected'} />}
         {section === 'draft' && <DraftWorkspace projectId="taps-for-rights" projectName="Taps for Rights" findings={findings} requirements={requirements} analysisConnected={connection.mode === 'connected'} proposal={proposalAvailable ? proposal : null} proposalBusy={proposalLoading} proposalError={proposalError} onRunProposal={runProposalReview} onOpenIssue={openFinding} onOpenRequirement={openRequirement} onOpenSource={openCitation} onOpenIntake={() => navigate('intake')} />}
 
         {section === 'proposal' && <>
@@ -408,6 +407,7 @@ export function Dashboard({ section, onNavigate, onExit, onProjects, theme, onTo
       </main>
     </div>
     {reviewFinding && <ReviewDialog finding={reviewFinding} onClose={() => setReviewFinding(null)} onSave={saveReview} />}
+    {newProjectOpen && <NewProjectDialog onClose={() => setNewProjectOpen(false)} onCreate={submitNewProject} />}
     {notice && <div className="dashboard-toast" role="status"><CheckCircle2 size={17} />{notice}<button type="button" onClick={() => setNotice('')} aria-label="Dismiss notice"><X size={16} /></button></div>}
   </div>
 }
