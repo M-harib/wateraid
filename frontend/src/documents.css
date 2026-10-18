@@ -52,6 +52,8 @@
 .documents-browser { display: grid; grid-template-columns: 252px minmax(0,1fr); gap: 16px; align-items: start; }
 .documents-folders { border: 1px solid var(--border); border-radius: 9px; background: var(--surface); padding: 10px; }
 .documents-folders-head { display: block; font: 700 10px ui-monospace, monospace; letter-spacing: .12em; color: var(--subtle); padding: 8px 8px 10px; }
+.documents-new-project { width: 100%; display: flex; align-items: center; gap: 8px; border: 1px dashed var(--border); border-radius: 7px; background: none; color: var(--accent); padding: 10px; font-size: 11px; font-weight: 700; margin-bottom: 8px; }
+.documents-new-project:hover { border-color: var(--accent); background: var(--accent-soft); }
 .documents-folder { width: 100%; display: flex; align-items: center; gap: 10px; text-align: left; border: 0; background: none; border-radius: 7px; padding: 10px; color: var(--ink); }
 .documents-folder:hover { background: var(--accent-soft); }
 .documents-folder.active { background: var(--accent-soft); }

@@ -74,7 +74,6 @@ export function BackendDocuments({ projectId, projectName, projects, onSelectPro
   return <div className="project-documents">
     <nav className="documents-breadcrumb">
       <span>Projects</span><ChevronRight size={15} /><strong>{projectName}</strong>
-      <button type="button" onClick={onNewProject}><Plus size={15} /> New project</button>
     </nav>
     {!connected && <div className="inline-error" role="alert">Connect the analysis service (set VITE_API_BASE_URL) to upload documents.</div>}
     {(error || notice) && <div className={error ? 'inline-error' : 'draft-notice'} role={error ? 'alert' : 'status'}>{error || notice}</div>}
@@ -82,6 +81,7 @@ export function BackendDocuments({ projectId, projectName, projects, onSelectPro
     <div className="documents-browser">
       <aside className="documents-folders">
         <span className="documents-folders-head">PROJECTS</span>
+        <button type="button" className="documents-new-project" onClick={onNewProject}><Plus size={15} /> New project</button>
         {projects.map((item) => {
           const active = item.projectId === projectId
           return <button type="button" key={item.projectId} className={`documents-folder ${active ? 'active' : ''}`} onClick={() => onSelectProject(item.projectId)}>
