@@ -62,6 +62,19 @@ html[data-theme='dark'] .status-met,html[data-theme='dark'] .status-mapped{backg
 .pdf-page-scroll{justify-content:flex-start}.pdf-page-scroll .react-pdf__Document{flex:none;width:max-content;max-width:none;margin:auto}.pdf-page-scroll .react-pdf__Page{margin:0 0 14px}.pdf-page-scroll canvas{max-width:none}.pdf-controls-divider{height:20px;border-left:1px solid #cadbce;margin:0 2px}
 .source-context .source-resolver{color:#2c6f49;font-size:12px;margin:-5px 0 15px}
 .workspace-assistant-toggle{margin-left:auto}
+.workspace-scope{display:flex;flex-direction:column;gap:3px}
+.workspace-scope strong{font-size:16px;letter-spacing:-.02em;color:var(--ink)}
+.sidebar-case-wrap{position:relative;margin:37px 8px 32px}
+.sidebar-case-wrap>.sidebar-case{margin:0;width:100%;cursor:pointer}
+.sidebar-case-cover{position:fixed;inset:0;z-index:30;background:transparent;border:0}
+.sidebar-case-menu{position:absolute;left:0;right:0;top:calc(100% + 5px);z-index:40;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 16px 44px #10231a2e;padding:6px;max-height:340px;overflow:auto}
+.sidebar-case-new{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;border:1px solid var(--accent);background:var(--accent);color:var(--on-accent);border-radius:7px;padding:10px;font-size:11px;font-weight:700;margin-bottom:6px}
+.sidebar-case-new:hover{background:var(--accent-hover);border-color:var(--accent-hover)}
+.sidebar-case-item{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;text-align:left;border:0;background:none;border-radius:7px;padding:9px 10px;color:var(--ink)}
+.sidebar-case-item:hover,.sidebar-case-item.active{background:var(--accent-soft)}
+.sidebar-case-item strong{display:block;font-size:12px}
+.sidebar-case-item small{display:block;font-size:10px;color:var(--muted)}
+.sidebar-case-item svg{color:var(--accent);flex:none}
 .documents-heading{display:flex;justify-content:space-between;align-items:flex-end;gap:16px;flex-wrap:wrap}
 .workspace-project-select{display:flex;flex-direction:column;gap:6px}
 .workspace-project-select label{font:700 9px ui-monospace,monospace;letter-spacing:.1em;color:#8a9e8f}
