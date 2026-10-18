@@ -111,7 +111,7 @@ export function BackendDocuments({ projectId, projectName, projects, onSelectPro
                 <button type="button" className="doc-delete" onClick={() => void remove(doc.doc_id)} aria-label={`Remove ${doc.filename}`}><Trash2 size={15} /></button>
               </div>
             </article>)}</div>
-          : <div className={`documents-empty-drop ${dragging ? 'dragging' : ''}`}><Upload size={24} /><p>Drop PDF, XLSX/XLS, or CSV files here, or use <strong>Add documents</strong>.</p></div>}
+          : <button type="button" className={`documents-empty-drop ${dragging ? 'dragging' : ''}`} disabled={!connected || uploading} onClick={() => inputRef.current?.click()}><Upload size={26} /><p>Drop PDF, XLSX/XLS, or CSV files here, or <strong>click to browse</strong>.</p></button>}
         {dragging && docs.length > 0 && <div className="documents-drop-hint">Drop to upload to {projectName}</div>}
       </section>
     </div>
