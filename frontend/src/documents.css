@@ -52,13 +52,13 @@
 .documents-browser { display: grid; grid-template-columns: 252px minmax(0,1fr); gap: 16px; align-items: start; }
 .documents-folders { border: 1px solid var(--border); border-radius: 9px; background: var(--surface); padding: 10px; }
 .documents-folders-head { display: block; font: 700 10px ui-monospace, monospace; letter-spacing: .12em; color: var(--subtle); padding: 8px 8px 10px; }
-.documents-new-project { width: 100%; display: flex; align-items: center; gap: 8px; border: 1px dashed var(--border); border-radius: 7px; background: none; color: var(--accent); padding: 10px; font-size: 11px; font-weight: 700; margin-bottom: 8px; }
-.documents-new-project:hover { border-color: var(--accent); background: var(--accent-soft); }
+.documents-new-project { width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px; border: 1px solid var(--accent); border-radius: 7px; background: var(--accent); color: var(--on-accent); padding: 11px; font-size: 11px; font-weight: 700; margin-bottom: 10px; box-shadow: 0 2px 8px color-mix(in srgb, var(--accent) 35%, transparent); }
+.documents-new-project:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
 .documents-folder { width: 100%; display: flex; align-items: center; gap: 10px; text-align: left; border: 0; background: none; border-radius: 7px; padding: 10px; color: var(--ink); }
 .documents-folder:hover { background: var(--accent-soft); }
-.documents-folder.active { background: var(--accent-soft); }
-.documents-folder-icon { flex: none; color: var(--muted); display: grid; place-items: center; }
-.documents-folder.active .documents-folder-icon { color: var(--accent); }
+.documents-folder.active { background: var(--accent-soft); box-shadow: inset 3px 0 0 var(--accent); }
+.documents-folder.active strong { color: var(--accent); }
+.documents-folder-icon { flex: none; color: var(--accent); display: grid; place-items: center; }
 .documents-folder > span:last-child { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
 .documents-folder strong { font-size: 12px; overflow-wrap: anywhere; }
 .documents-folder small { font-size: 10px; color: var(--muted); }

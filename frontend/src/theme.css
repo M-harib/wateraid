@@ -9,6 +9,7 @@
   --accent: #245ac2;
   --accent-hover: #19489e;
   --accent-soft: #edf2fc;
+  --on-accent: #ffffff;
   --border: #e2e5e9;
   --button: #20242b;
   --button-hover: #3b424c;
@@ -29,6 +30,7 @@ html[data-theme='dark'] {
   --accent: #a5c0f7;
   --accent-hover: #c5d6fb;
   --accent-soft: #252f43;
+  --on-accent: #0f1522;
   --border: #30353e;
   --button: #f0f1f3;
   --button-hover: #d7dce4;
