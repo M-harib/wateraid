@@ -3,8 +3,8 @@
 .rcal-sample { margin: 0; padding: 12px 14px; border: 1px solid var(--border); border-radius: 9px; background: var(--surface-soft); color: var(--muted); font-size: 13px; line-height: 1.5; }
 .rcal-sample strong { color: var(--ink); }
 .rcal-layout { display: flex; flex-wrap: wrap; gap: 20px; align-items: flex-start; }
-.rcal-picker { flex: 1 1 340px; min-width: 0; max-width: 440px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 18px; display: flex; flex-direction: column; gap: 14px; }
-.rcal-detail { flex: 999 1 420px; min-width: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 22px; display: flex; flex-direction: column; gap: 12px; }
+.rcal-picker { flex: 1 1 520px; min-width: 0; max-width: 740px; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 22px; display: flex; flex-direction: column; gap: 14px; }
+.rcal-detail { flex: 1 1 520px; min-width: 0; background: var(--surface); border: 1px solid var(--border); border-radius: 12px; padding: 22px; display: flex; flex-direction: column; gap: 12px; }
 .rcal-toolbar { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
 .rcal-toolbar h2 { margin: 0; font-size: 17px; font-weight: 600; color: var(--ink); }
 .rcal-nav { width: 44px; height: 44px; display: grid; place-items: center; border: 1px solid var(--border); border-radius: 7px; background: var(--surface-raised); color: var(--ink); }

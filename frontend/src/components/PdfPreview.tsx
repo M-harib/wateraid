@@ -95,7 +95,7 @@ export function PdfPreview({ title, url, page, highlight }: Props) {
                   <div className="pdf-page-wrap" id={`pdf-page-${index + 1}`} key={index + 1}>
                     <Page
                       pageNumber={index + 1}
-                      width={Math.round(width * zoom)}
+                      width={Math.round(Math.min(width, 900) * zoom)}
                       renderTextLayer
                       renderAnnotationLayer={false}
                       customTextRenderer={!page || page === index + 1 ? textRenderer : undefined}
