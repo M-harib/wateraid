@@ -62,6 +62,11 @@ html[data-theme='dark'] .status-met,html[data-theme='dark'] .status-mapped{backg
 .pdf-page-scroll{justify-content:flex-start}.pdf-page-scroll .react-pdf__Document{flex:none;width:max-content;max-width:none;margin:auto}.pdf-page-scroll .react-pdf__Page{margin:0 0 14px}.pdf-page-scroll canvas{max-width:none}.pdf-controls-divider{height:20px;border-left:1px solid #cadbce;margin:0 2px}
 .source-context .source-resolver{color:#2c6f49;font-size:12px;margin:-5px 0 15px}
 .workspace-assistant-toggle{margin-left:auto}
+.sidebar-workspaces{margin:16px 8px 4px;width:calc(100% - 16px);display:flex;align-items:center;justify-content:center;gap:10px;border:0;border-radius:11px;background:var(--accent);color:var(--on-accent);padding:15px;font-size:15px;font-weight:800;letter-spacing:.01em;cursor:pointer;box-shadow:0 6px 18px color-mix(in srgb,var(--accent) 40%,transparent)}
+.sidebar-workspaces:hover{background:var(--accent-hover)}
+.sidebar-workspaces svg{flex:none}
+.is-sidebar-collapsed .sidebar-workspaces{padding:13px 0}
+.is-sidebar-collapsed .sidebar-workspaces span{display:none}
 .workspace-scope{display:flex;flex-direction:column;gap:3px}
 .workspace-scope strong{font-size:16px;letter-spacing:-.02em;color:var(--ink)}
 .sidebar-case-wrap{position:relative;margin:37px 8px 32px}

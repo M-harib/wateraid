@@ -342,6 +342,7 @@ export function Dashboard({ section, onNavigate, onExit, onProjects, theme, onTo
     {mobileNav && <button className="mobile-nav-cover" type="button" onClick={() => setMobileNav(false)} aria-label="Close navigation" />}
     <aside className={`dashboard-sidebar ${mobileNav ? 'is-open' : ''}`}>
       <div className="sidebar-header"><button className="dashboard-brand" type="button" onClick={onExit} aria-label="GrantGuard home" title="GrantGuard home"><BrandMark /><span>GrantGuard</span></button><button type="button" className="sidebar-collapse-toggle" onClick={toggleSidebar} aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'} title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'} aria-expanded={!sidebarCollapsed}>{sidebarCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}</button></div>
+      <button type="button" className="sidebar-workspaces" onClick={onProjects} title="Workspaces"><FolderOpen size={19} /> <span>Workspaces</span></button>
       <div className="sidebar-case-wrap">
         <button className="sidebar-case" type="button" onClick={() => setProjectMenuOpen((open) => !open)} title="Switch project" aria-haspopup="menu" aria-expanded={projectMenuOpen}><span className="sidebar-case-monogram">{projectInitials(projectName)}</span><span><strong>{projectName}</strong><small>Switch project ▾</small></span></button>
         {projectMenuOpen && <>
@@ -354,7 +355,7 @@ export function Dashboard({ section, onNavigate, onExit, onProjects, theme, onTo
       </div>
       <span className="sidebar-caption">WORKSPACE</span>
       <nav aria-label="Dashboard navigation">{nav.map(({ section: target, title, icon: Icon }) => <button type="button" key={target} className={`dashboard-nav-item ${section === target ? 'active' : ''}`} onClick={() => navigate(target)} aria-label={title} title={title} aria-current={section === target ? 'page' : undefined}><Icon size={18} /><span>{title}</span>{target === 'issues' && findings.length > 0 && <em>{findings.length}</em>}{target === 'proposal' && proposal.checklist.length > 0 && <em>{proposal.checklist.length}</em>}</button>)}</nav>
-      <div className="sidebar-bottom"><span className="sidebar-divider" /><span className="sidebar-caption">CASE VIEW</span><p>Historical scenario<br /><strong>{formatDate(connection.data.asOf)}</strong></p><button type="button" onClick={onProjects} aria-label="Workspaces" title="Workspaces"><FolderOpen size={16} /><span>Workspaces</span></button></div>
+      <div className="sidebar-bottom"><span className="sidebar-divider" /><span className="sidebar-caption">CASE VIEW</span><p>Historical scenario<br /><strong>{formatDate(connection.data.asOf)}</strong></p></div>
     </aside>
 
     <div className="dashboard-body">
