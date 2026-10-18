@@ -29,9 +29,9 @@
 .documents-list strong { font-size: 12px; overflow-wrap: anywhere; }
 .documents-list small, .documents-list em { color: var(--muted); font-size: 10px; font-style: normal; }
 .documents-list em { color: var(--subtle); }
-.documents-file-actions { display: flex; flex-wrap: wrap; gap: 6px; }
-.documents-file-actions button { border: 1px solid var(--border); border-radius: 5px; background: var(--surface); color: var(--accent); padding: 7px; font-size: 10px; }
-.documents-file-actions button:hover { border-color: var(--accent); }
+.documents-file-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; }
+.documents-file-actions a, .documents-file-actions button { display: inline-flex; align-items: center; justify-content: center; gap: 6px; height: 32px; border: 1px solid var(--border); border-radius: 6px; background: var(--surface); color: var(--accent); padding: 0 11px; font-size: 11px; font-weight: 600; }
+.documents-file-actions a:hover, .documents-file-actions button:hover { border-color: var(--accent); background: var(--accent-soft); }
 .documents-file-actions button:disabled { color: var(--subtle); }
 .documents-empty { padding: 50px 20px; text-align: center; color: var(--subtle); font-size: 12px; }
 .documents-side { padding: 23px; }
