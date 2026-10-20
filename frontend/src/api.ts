@@ -1,5 +1,5 @@
 import { z } from 'zod'
-import { FindingSchema, ProposalWorkspaceSchema, RequirementSchema, type DashboardData, type Finding, type ProposalWorkspace, type Requirement } from './domain'
+import { EvidenceSchema, FindingSchema, ProposalWorkspaceSchema, RequirementSchema, type DashboardData, type Finding, type ProposalWorkspace, type Requirement } from './domain'
 
 export type DashboardConnection =
   | { mode: 'preview'; data: DashboardData }
@@ -252,4 +252,27 @@ export async function askProjectQuestion(projectId: string, question: string): P
 
 export function projectDocumentFileUrl(projectId: string, docId: string): string {
   return `${apiBase()}/projects/${encodeURIComponent(projectId)}/documents/${encodeURIComponent(docId)}/file`
+}
+
+// Writing help for one proposal page: cited tips, and draft sentences the user can paste and edit.
+// Pack quotes are verified server-side; draftQuotes are verified against the page text that was sent.
+const WritingItemSchema = z.object({ text: z.string().min(1), evidence: z.array(EvidenceSchema).default([]), draftQuotes: z.array(z.string()).default([]) })
+const WritingHelpSchema = z.object({
+  tips: z.array(WritingItemSchema).default([]),
+  sentences: z.array(WritingItemSchema.extend({ placeholders: z.array(z.string()).default([]) })).default([]),
+  missingInformation: z.array(z.string()).default([]),
+  removed: z.array(z.string()).default([]),
+  searched: z.array(z.string()).default([]),
+})
+export type WritingHelp = z.infer<typeof WritingHelpSchema>
+
+export async function requestWritingHelp(input: { heading: string; body: string; question: string }): Promise<WritingHelp> {
+  const body = await requestJson('/proposal/writing-help', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ heading: input.heading.slice(0, 300), body: input.body.slice(0, 20_000), question: input.question }),
+  }, 150_000)
+  const parsed = WritingHelpSchema.safeParse(body)
+  if (!parsed.success) throw new Error('Writing help did not match the dashboard schema')
+  return parsed.data
 }
