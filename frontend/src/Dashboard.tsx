@@ -21,10 +21,10 @@ type Focus = { kind: 'finding'; id: string } | { kind: 'requirement'; id: string
 type Props = { section: DashboardSection; onNavigate: (section: DashboardSection) => void; onExit: () => void; onProjects: () => void; theme: Theme; onToggleTheme: () => void }
 
 const nav: { section: DashboardSection; title: string; icon: typeof LayoutDashboard }[] = [
+  { section: 'overview', title: 'Overview', icon: LayoutDashboard },
   { section: 'intake', title: 'Project documents', icon: FolderOpen },
   { section: 'draft', title: 'Proposal draft', icon: FileText },
   { section: 'proposal', title: 'Proposal review', icon: ClipboardCheck },
-  { section: 'overview', title: 'Overview', icon: LayoutDashboard },
   { section: 'issues', title: 'Issues', icon: CircleAlert },
   { section: 'obligations', title: 'Obligations', icon: BookOpenText },
   { section: 'calendar', title: 'Reporting calendar', icon: CalendarDays },
@@ -360,7 +360,7 @@ export function Dashboard({ section, onNavigate, onExit, onProjects, theme, onTo
 
       <main className={`dashboard-main dashboard-${section}`}>
         {section === 'intake' && <BackendDocuments projectId={projectId} projectName={projectName} connected={connection.mode === 'connected'} />}
-        {section === 'draft' && <DraftWorkspace projectId="taps-for-rights" projectName="Taps for Rights" findings={findings} requirements={requirements} analysisConnected={connection.mode === 'connected'} proposal={proposalAvailable ? proposal : null} proposalBusy={proposalLoading} proposalError={proposalError} onRunProposal={runProposalReview} onOpenIssue={openFinding} onOpenRequirement={openRequirement} onOpenSource={openCitation} onOpenIntake={() => navigate('intake')} />}
+        {section === 'draft' && <DraftWorkspace projectId="taps-for-rights" projectName="Taps for Rights" findings={findings} requirements={requirements} analysisConnected={connection.mode === 'connected'} proposal={proposalAvailable ? proposal : null} onOpenIssue={openFinding} onOpenRequirement={openRequirement} onOpenSource={openCitation} onOpenIntake={() => navigate('intake')} />}
 
         {section === 'proposal' && <>
           <SectionHeading eyebrow="PRE-SUBMISSION REVIEW / PROPOSAL" title="Check the proposal against the call." subtitle="Ask any proposal question, or run the structured review and inspect every cited source." aside={<span className="heading-count">{proposal.checklist.length} checks</span>} />

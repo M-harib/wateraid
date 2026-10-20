@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import os
 from contextlib import asynccontextmanager
+from urllib.error import HTTPError
 
 from dotenv import load_dotenv
 from fastapi import FastAPI, File, Request, UploadFile
@@ -18,6 +19,7 @@ from core import Core, OpenRouterLLM
 from core.workspace import Workspace
 from tools.compliance import ComplianceAssistant
 from tools.proposal import ProposalAssistant
+from tools.proposal.writing import WritingAssistant, WritingUnavailable
 from tools.workspace import WorkspaceAssistant
 
 _MEDIA = {
@@ -34,6 +36,7 @@ from .serialize import (
     issues_payload,
     proposal_payload,
     reviewer_rows_to_view,
+    writing_help_to_view,
 )
 
 
@@ -53,6 +56,25 @@ class AskRequest(BaseModel):
     question: str
 
 
+def _provider_error(exc: Exception) -> str:
+    """A safe, actionable message for a failed model call; never the provider's body or credentials.
+    OpenRouterLLM wraps HTTP errors in RuntimeError, so look at the cause too."""
+    http = exc if isinstance(exc, HTTPError) else exc.__cause__ if isinstance(exc.__cause__, HTTPError) else None
+    if http is not None and http.code in {401, 402, 403}:
+        return "Analysis provider rejected the request. Check server-side model credentials or credits."
+    if http is not None and http.code == 429:
+        return "Analysis provider is temporarily rate limited. Try again shortly."
+    if isinstance(exc, RuntimeError) and "API_KEY not set" in str(exc):
+        return "No model API key is configured on the server."
+    return "Analysis service unavailable or timed out."
+
+
+class WritingHelpRequest(BaseModel):
+    heading: str = Field(default="", max_length=300)
+    body: str = Field(default="", max_length=20_000)
+    question: str = Field(max_length=2_000)
+
+
 class ProposalAskRequest(BaseModel):
     question: str
     documentIds: list[str] | None = Field(default=None, min_length=1, max_length=6)
@@ -70,6 +92,7 @@ def create_app(*, core: Core | None = None, llm=None) -> FastAPI:
         app.state.model = model
         app.state.assistant = ComplianceAssistant(c, model)
         app.state.proposal = ProposalAssistant(c, model)
+        app.state.writing = WritingAssistant(app.state.proposal)
         app.state.proposal_run = ProposalRunTracker()
         app.state.workspace = Workspace()
         await app.state.workspace.load_all()  # re-ingest persisted uploads
@@ -136,6 +159,19 @@ def create_app(*, core: Core | None = None, llm=None) -> FastAPI:
     async def proposal_run(request: Request):
         """Start the review in the background and return immediately."""
         return await request.app.state.proposal_run.start(request.app.state.proposal)
+
+    @app.post("/proposal/writing-help")
+    async def proposal_writing_help(request: Request, body: WritingHelpRequest):
+        """Cited tips and editable draft sentences for one proposal page; not stored as a finding."""
+        if not body.question.strip():
+            return JSONResponse({"detail": "question is required"}, status_code=400)
+        try:
+            result = await request.app.state.writing.help(body.heading, body.body, body.question)
+        except WritingUnavailable as exc:
+            return JSONResponse({"detail": str(exc)}, status_code=503)
+        except (HTTPError, OSError, RuntimeError, TimeoutError) as exc:
+            return JSONResponse({"detail": _provider_error(exc)}, status_code=503)
+        return writing_help_to_view(result)
 
     @app.get("/proposal/run/status")
     async def proposal_run_status(request: Request):

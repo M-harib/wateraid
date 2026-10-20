@@ -40,6 +40,95 @@ Combine `main` (teammate's backend + proposal review, through `f6b342c`) with th
 - Verified: `pytest -q` 165 passed; `tsc` and `npm run build` pass; live run returned 202 and progressed to completed; Q5 answer shows medium confidence and conflicting evidence; Playwright: progress steps render, answer citation opens the PDF with highlights, 0 px mobile overflow, no console errors.
 - New backend issue: `startup()` now runs all five steps concurrently; the checklist step then failed in 2 of 2 runs ("Response must be a finite JSON object"), versus 1 of 3 when sequential.
 
+## Navigation and Review desk (Claude) — branch `feat/review-desk-writing-help`
+- Overview is first in the dashboard nav. `/projects/taps-for-rights` now opens Overview; Project documents moved to `/projects/taps-for-rights/intake`.
+- Changes to the Proposal draft Review desk:
+  - Removed "Proposal checks" (a copy of the run button on Proposal review) and "Human Approval" (it only set a browser-local flag).
+  - Requirements show only when there are rows: the proposal checklist first, then `/obligations`. `/obligations` is a backend stub that returns `[]`, and the checklist step currently fails.
+  - Added "Suggestions for this page" from `reviewDeskMock.ts`. It is **Sample data**, Taps for Rights only, and every bullet cites a pack page.
+  - Case proposal pages imported as "Page 1–6" map to the template sections they cover.
+  - A "Copy suggestions" button copies the bullets so they can be pasted into the document.
+- `approvedAt` stays in the stored draft schema so existing saved drafts still load.
+- Verified:
+  - `npm run build` passes.
+  - Playwright (Chrome) on 5173: the desk shows Issues, Suggestions and AI writing help, with no approval block.
+  - Page 1 shows 8 bullets, page 3 shows 7, page 6 shows 3, and a blank page gets the general set.
+  - Copying put 8 lines on the clipboard, and pasting them into page 1 worked.
+  - Mobile overflow is 0 px and there were no console errors.
+
+## Draft editor: AI suggestions, drag and drop, undo (Claude) — branch `feat/review-desk-writing-help`
+- Fixed: every edit to a page used to clear the AI writing-help answer. Answers now stay until the next request or a project switch.
+- "Added" is now worked out from whether the suggestion's text is still in a page, so deleting the text re-enables "Add to doc".
+- "Add to doc" is replaced by **Copy** on each suggestion, and "Add selected phrase" is now "Copy selected phrase".
+  - Pasting the copied text into a page inserts it at the cursor and adds the answer's source notes (`pasteIntoPage` matches the last copied suggestion).
+  - Any other paste behaves normally.
+  - Verified: the clipboard held the suggestion, paste added "Funding call · page 5" to page 1, and a plain paste added no note.
+- Suggestions can be dropped on any page, not only the page they were generated for. Each one brings its answer's citations into that page's source notes.
+- A drop on a page body inserts at the drop point. `textIndexAtPoint` lays a transparent copy of the textarea over it and uses `caretPositionFromPoint` / `caretRangeFromPoint`. A drop elsewhere on a page uses the last cursor position, or the end of the page.
+- Added undo/redo for the draft (100 steps):
+  - Buttons in the editor toolbar, plus ⌘Z / Ctrl+Z, and ⇧⌘Z / Ctrl+Shift+Z / Ctrl+Y.
+  - Typing in one field counts as one step until a 1 s pause.
+  - Page add, delete, move, template, import and suggestion inserts are separate steps.
+  - Fields outside the draft pages, such as the writing-help box, keep the browser's native undo.
+- Verified:
+  - `npm run build` passes.
+  - Playwright (Chrome, `/proposal/ask` stubbed): the panel keeps both suggestions after the inserted text is deleted, and the button goes back to "Add to doc".
+  - Dragging to page 3 inserted at index 8 (the drop point) and added the "Funding call · page 5" note.
+  - Ctrl/Cmd+Z removed it and redo restored it. One undo removes a typed run, and undo restores a deleted page.
+  - Undo in the help box leaves the pages alone. No console errors.
+
+## Writing help endpoint (Claude) — branch `feat/review-desk-writing-help`
+- **Why:** AI Writing Help sent writing requests to `/proposal/ask`.
+  - That endpoint is a checker whose prompt says "Never generate a proposal", so it returned cited Q&A answers.
+  - The UI split those answers into sentences, so critique and the "Verified calculation" line could be pasted into the proposal.
+  - Each request was also stored as a "Generic Qa" finding.
+- **New `POST /proposal/writing-help {heading, body, question}`** (`backend/tools/proposal/writing.py`, `backend/api/main.py`, `backend/api/serialize.py`):
+  - Returns `{tips, sentences, missingInformation, removed, searched}`.
+  - Model: `mini` tier.
+  - Sources: the funding call (01) and GAC reviewer questions (06), top-ranked for the page and request. The draft page is sent separately.
+  - Kept in memory per page and request, and not stored as a finding.
+- **Checks in code, not the model:**
+  - Every pack quote goes through `cite()`.
+  - Quotes from the page use `unit_id: "DRAFT"` and are verified against the draft text. Draft wording mislabelled as a pack quote is relabelled as a draft quote.
+  - Sentences are dropped if they have no verified evidence, use a number or number word that isn't in the cited quotes or draft, or state a compliance verdict (`_VERDICT`).
+  - Placeholders are pulled from `[brackets]` by code.
+  - If items are dropped, the model gets one repair pass with the exact reasons; the better of the two attempts is kept.
+- **Frontend:**
+  - `requestWritingHelp` and a zod schema in `api.ts`.
+  - The Review desk shows Tips (with source links and "Your draft" quotes), Sentences you can use (placeholders highlighted, Copy and drag), You need to supply, and a count of left-out items with details on hover.
+  - Pasting or dropping a sentence adds that sentence's own citations to the page's source notes.
+  - The desk no longer calls `/proposal/ask` or `/ask`.
+- **Verified:**
+  - `pytest -q` (before the merge below): **174 passed**, including 9 in `backend/tests/test_writing.py`.
+  - `npm run build` passes.
+  - Live with the real model:
+    - Page 1 cost share took 4–11 s. Tips were cited to 01 p.5 and the draft.
+    - Sentences used Water Care's own commitments with placeholders, e.g. "[describe in-kind resources here]".
+    - Copy then paste added the "Funding call · page 5" note, and dragging into page 2 worked.
+    - `/findings` stayed at 0, mobile overflow was 0 px and there were no console errors.
+- **Limits:**
+  - The pack has no budget figures or contact details, so sentences use placeholders for them. Adding a "Project facts" input would let the model fill them with cited, staff-entered values.
+  - The compliance guard is a phrase list, so new wordings can slip through. Sentences are always for the project manager to review and edit.
+  - Answers vary between runs, and the repair pass adds about 5 s when used.
+
+## Merge with teammate PRs #7–#10 (Claude)
+- Rebased this work onto `origin/main` `dc73925`.
+  - **#7:** FE-valid answer shapes.
+  - **#8:** per-project uploads and `/projects/{id}/ask`.
+  - **#9:** backend moved to `backend/`.
+  - **#10:** evidence workspace and full-width layout.
+- **Conflicts resolved:**
+  - `backend/api/main.py`: kept both the workspace routes and `/proposal/writing-help`.
+  - `frontend/src/api.ts`: kept the project/upload client and the writing-help client.
+  - `frontend/src/Dashboard.tsx`: kept their `BackendDocuments` intake, and my Draft props without the removed run-button props.
+- `writing.py` and `test_writing.py` moved to `backend/tools/proposal/` and `backend/tests/`.
+- `writing_help_to_view` now uses their `_valid_locator` filter.
+- **Verified:**
+  - From `backend/`: `pytest -q` **195 passed** (their 186 plus my 9).
+  - `npm run build` passes. The chunk-size warning comes from #10's eager `PdfPreview` import.
+  - Live checks are listed in the commit and PR.
+- **Setup note:** the root `.venv` needs `python-multipart==0.0.32` (added in #8). Run the backend from `backend/`.
+
 ## Open issues (Claude)
 
 - **Backend, for the proposal owner:** "Cost Share Vs Call" failed in all 3 full runs (`tools/proposal/evidence.py` `cited_percentage` rejects quotes with zero or several percentages); the checklist failed once with "Response must be a finite JSON object"; checklist row count varies (14 vs 16). Every `/proposal/ask` is stored as a proposal finding, so writing-help requests appear as "Generic Qa" priority findings.
