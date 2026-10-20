@@ -216,3 +216,19 @@ def proposal_payload(findings: list[Finding]) -> dict:
         "reviewerQuestions": reviewer_rows_to_view(reviewer_rows),
         "failures": failures,
     }
+
+
+def writing_help_to_view(result) -> dict:
+    """tools.proposal.writing.WritingHelp -> frontend WritingHelpSchema."""
+    def cited(evidence) -> list[dict]:
+        return [evidence_full(ev) for ev in evidence if _valid_locator(ev.ref)]
+
+    return {
+        "tips": [{"text": tip.text, "evidence": cited(tip.evidence), "draftQuotes": tip.draft_quotes}
+                 for tip in result.tips],
+        "sentences": [{"text": item.text, "placeholders": item.placeholders, "evidence": cited(item.evidence),
+                       "draftQuotes": item.draft_quotes} for item in result.sentences],
+        "missingInformation": result.missing_information,
+        "removed": result.removed,
+        "searched": result.searched,
+    }
