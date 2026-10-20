@@ -21,10 +21,10 @@ type Focus = { kind: 'finding'; id: string } | { kind: 'requirement'; id: string
 type Props = { section: DashboardSection; onNavigate: (section: DashboardSection) => void; onExit: () => void; onProjects: () => void; theme: Theme; onToggleTheme: () => void }
 
 const nav: { section: DashboardSection; title: string; icon: typeof LayoutDashboard }[] = [
+  { section: 'overview', title: 'Overview', icon: LayoutDashboard },
   { section: 'intake', title: 'Project documents', icon: FolderOpen },
   { section: 'draft', title: 'Proposal draft', icon: FileText },
   { section: 'proposal', title: 'Proposal review', icon: ClipboardCheck },
-  { section: 'overview', title: 'Overview', icon: LayoutDashboard },
   { section: 'issues', title: 'Issues', icon: CircleAlert },
   { section: 'obligations', title: 'Obligations', icon: BookOpenText },
   { section: 'calendar', title: 'Reporting calendar', icon: CalendarDays },

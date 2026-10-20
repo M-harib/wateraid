@@ -13,7 +13,7 @@ function readRoute(): Route {
   const [, root, section, projectSection] = window.location.pathname.split('/')
   if (root === 'projects' && section === demoProjectId) {
     if (projectSection === 'ask') return { kind: 'dashboard', section: 'documents' }
-    return { kind: 'dashboard', section: sections.includes(projectSection as DashboardSection) ? projectSection as DashboardSection : 'intake' }
+    return { kind: 'dashboard', section: sections.includes(projectSection as DashboardSection) ? projectSection as DashboardSection : 'overview' }
   }
   if (root === 'projects') return { kind: 'projects', projectId: section, projectSection: projectSection === 'draft' ? 'draft' : 'intake' }
   if (root !== 'dashboard') return { kind: 'landing' }
@@ -36,7 +36,7 @@ export default function App() {
   function toggleTheme() { setTheme((current) => current === 'light' ? 'dark' : 'light') }
 
   function navigate(next: Route) {
-    const path = next.kind === 'landing' ? '/' : next.kind === 'projects' ? next.projectId ? `/projects/${next.projectId}/${next.projectSection === 'draft' ? 'draft' : 'intake'}` : '/projects' : next.section === 'intake' ? `/projects/${demoProjectId}` : `/projects/${demoProjectId}/${next.section}`
+    const path = next.kind === 'landing' ? '/' : next.kind === 'projects' ? next.projectId ? `/projects/${next.projectId}/${next.projectSection === 'draft' ? 'draft' : 'intake'}` : '/projects' : next.section === 'overview' ? `/projects/${demoProjectId}` : `/projects/${demoProjectId}/${next.section}`
     window.history.pushState({}, '', path)
     setRoute(next)
     window.scrollTo({ top: 0, behavior: 'instant' })
@@ -45,6 +45,6 @@ export default function App() {
   return route.kind === 'landing'
     ? <LandingPage onEnter={() => navigate({ kind: 'projects' })} theme={theme} onToggleTheme={toggleTheme} />
     : route.kind === 'projects'
-      ? <ProjectsPage projectId={route.projectId} projectSection={route.projectSection} onHome={() => navigate({ kind: 'landing' })} onProjects={() => navigate({ kind: 'projects' })} onOpenDemo={() => navigate({ kind: 'dashboard', section: 'intake' })} onOpenProject={(projectId, projectSection = 'intake') => navigate({ kind: 'projects', projectId, projectSection })} theme={theme} onToggleTheme={toggleTheme} />
+      ? <ProjectsPage projectId={route.projectId} projectSection={route.projectSection} onHome={() => navigate({ kind: 'landing' })} onProjects={() => navigate({ kind: 'projects' })} onOpenDemo={() => navigate({ kind: 'dashboard', section: 'overview' })} onOpenProject={(projectId, projectSection = 'intake') => navigate({ kind: 'projects', projectId, projectSection })} theme={theme} onToggleTheme={toggleTheme} />
       : <Dashboard section={route.section} onNavigate={(section) => navigate({ kind: 'dashboard', section })} onExit={() => navigate({ kind: 'landing' })} onProjects={() => navigate({ kind: 'projects' })} theme={theme} onToggleTheme={toggleTheme} />
 }
