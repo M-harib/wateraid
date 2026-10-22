@@ -193,6 +193,25 @@ export async function loadProjects(): Promise<ProjectSummary[]> {
   return parsed.data.projects
 }
 
+export async function renameProject(projectId: string, name: string): Promise<ProjectSummary> {
+  const body = await requestJson(`/projects/${encodeURIComponent(projectId)}`, {
+    method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }),
+  }, 20_000)
+  const parsed = ProjectSummarySchema.safeParse(body)
+  if (!parsed.success) throw new Error('Rename response did not match the dashboard schema')
+  return parsed.data
+}
+
+export async function deleteProject(projectId: string): Promise<void> {
+  await requestJson(`/projects/${encodeURIComponent(projectId)}`, { method: 'DELETE' }, 20_000)
+}
+
+/** Confirmation text shared by every place that deletes a project. */
+export function confirmProjectDelete(project: { name: string; documentCount?: number }): boolean {
+  const count = project.documentCount ?? 0
+  return window.confirm(`Delete “${project.name}”?\n\nThis permanently removes the project${count ? ` and its ${count} uploaded document${count === 1 ? '' : 's'}` : ''} from the server. The bundled case files and your proposal draft are not affected.`)
+}
+
 export async function createProject(name: string): Promise<ProjectSummary> {
   const body = await requestJson('/projects', {
     method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ name }),

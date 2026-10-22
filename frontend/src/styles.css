@@ -75,6 +75,9 @@ html[data-theme='dark'] .status-met,html[data-theme='dark'] .status-mapped{backg
 .sidebar-case-menu{position:absolute;left:0;right:0;top:calc(100% + 5px);z-index:40;background:var(--surface);border:1px solid var(--border);border-radius:10px;box-shadow:0 16px 44px #10231a2e;padding:6px;max-height:340px;overflow:auto}
 .sidebar-case-new{width:100%;display:flex;align-items:center;justify-content:center;gap:8px;border:1px solid var(--accent);background:var(--accent);color:var(--on-accent);border-radius:7px;padding:10px;font-size:11px;font-weight:700;margin-bottom:6px}
 .sidebar-case-new:hover{background:var(--accent-hover);border-color:var(--accent-hover)}
+.sidebar-case-rename{width:100%;display:flex;align-items:center;gap:8px;border:0;background:none;border-radius:7px;padding:9px 10px;margin-bottom:4px;color:var(--muted);font-size:11px;text-align:left;overflow-wrap:anywhere}
+.sidebar-case-rename:hover:not(:disabled){background:var(--surface-soft);color:var(--accent)}
+.sidebar-case-rename:disabled{opacity:.5;cursor:default}
 .sidebar-case-item{width:100%;display:flex;align-items:center;justify-content:space-between;gap:8px;text-align:left;border:0;background:none;border-radius:7px;padding:9px 10px;color:var(--ink)}
 .sidebar-case-item:hover,.sidebar-case-item.active{background:var(--accent-soft)}
 .sidebar-case-item strong{display:block;font-size:12px}
@@ -109,3 +112,11 @@ html[data-theme='dark'] .status-met,html[data-theme='dark'] .status-mapped{backg
 .doc-badge.busy{background:#eef2f7;color:#4a6b8a}
 .spin{animation:gg-spin 1s linear infinite}
 @keyframes gg-spin{to{transform:rotate(360deg)}}
+
+.sidebar-case-rename.danger:hover:not(:disabled){background:var(--danger-soft);color:var(--danger)}
+.project-card-wrap{position:relative;display:flex}
+.project-card-wrap>.project-card{flex:1;width:100%}
+.project-card-actions{position:absolute;right:16px;bottom:18px;display:flex;gap:4px}
+.project-card-actions button{display:inline-flex;align-items:center;justify-content:center;width:32px;height:32px;border:1px solid var(--border);border-radius:7px;background:var(--surface);color:var(--muted)}
+.project-card-actions button:hover{color:var(--accent);border-color:var(--accent)}
+.project-card-actions button.danger:hover{color:var(--danger);border-color:var(--danger);background:var(--danger-soft)}

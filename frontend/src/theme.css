@@ -16,6 +16,8 @@
   --button-text: #ffffff;
   --shadow: #19202d08;
   --mark-stroke: #ffffff;
+  --danger: #9b1c1c;
+  --danger-soft: #fdecec;
   color-scheme: light;
 }
 
@@ -37,6 +39,8 @@ html[data-theme='dark'] {
   --button-text: #161a22;
   --shadow: #00000038;
   --mark-stroke: #161a22;
+  --danger: #f5b4b4;
+  --danger-soft: #3a1f22;
   color-scheme: dark;
 }
 
