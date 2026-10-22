@@ -6,6 +6,7 @@ import './theme.css'
 import './draft.css'
 import './calendar.css'
 import './documents.css'
+import './sidebar.css'
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { ArrowRight, ArrowUpRight, BookOpenText, CalendarDays, Check, CheckCircle2, ChevronRight, CircleAlert, ClipboardCheck, FileQuestion, FileSpreadsheet, FileText, FolderOpen, LayoutDashboard, Menu, MessageSquareText, PanelLeftClose, PanelLeftOpen, Plus, Search, ShieldCheck, X } from 'lucide-react'
-import { askProjectQuestion, askProposalQuestion, createProject, loadDashboard, loadProjectDocuments, loadProjects, loadProposalRunStatus, loadProposalWorkspace, projectDocumentFileUrl, runProposalChecks, type AskAnswer, type DashboardConnection, type ProjectDocument, type ProjectSummary, type ProposalRunStatus } from './api'
+import { ArrowRight, ArrowUpRight, BookOpenText, CalendarDays, Check, CheckCircle2, ChevronRight, CircleAlert, ClipboardCheck, FileQuestion, FileSpreadsheet, FileText, FolderOpen, LayoutDashboard, Menu, MessageSquareText, PanelLeftClose, PanelLeftOpen, Pencil, Plus, Search, Trash2, X } from 'lucide-react'
+import { askProjectQuestion, askProposalQuestion, confirmProjectDelete, createProject, deleteProject, renameProject, loadDashboard, loadProjectDocuments, loadProjects, loadProposalRunStatus, loadProposalWorkspace, projectDocumentFileUrl, runProposalChecks, type AskAnswer, type DashboardConnection, type ProjectDocument, type ProjectSummary, type ProposalRunStatus } from './api'
 import { BrandMark } from './Brand'
 import { APP_NAME } from './product'
 import { ReviewDialog } from './components/ReviewDialog'
@@ -14,6 +14,7 @@ import { PdfPreview } from './components/PdfPreview'
 import { documentById, documents } from './documents'
 import { evidenceLocation, type Finding, type ProposalWorkspace, type Requirement } from './domain'
 import { investigations, type Investigation } from './investigations'
+import { loadDraft } from './draft'
 import { appendReview, evidenceFingerprint, latestReviewFor, loadReviews, type ReviewDecision, type ReviewRecord } from './reviews'
 import type { Theme } from './theme'
 
@@ -21,17 +22,18 @@ export type DashboardSection = 'intake' | 'draft' | 'proposal' | 'overview' | 'i
 type Focus = { kind: 'finding'; id: string } | { kind: 'requirement'; id: string } | { kind: 'investigation'; id: string } | null
 type Props = { section: DashboardSection; onNavigate: (section: DashboardSection) => void; onExit: () => void; onProjects: () => void; theme: Theme; onToggleTheme: () => void }
 
-const nav: { section: DashboardSection; title: string; icon: typeof LayoutDashboard }[] = [
-  { section: 'overview', title: 'Overview', icon: LayoutDashboard },
-  { section: 'intake', title: 'Project documents', icon: FolderOpen },
-  { section: 'draft', title: 'Proposal draft', icon: FileText },
-  { section: 'proposal', title: 'Proposal review', icon: ClipboardCheck },
-  { section: 'issues', title: 'Issues', icon: CircleAlert },
-  { section: 'obligations', title: 'Obligations', icon: BookOpenText },
-  { section: 'calendar', title: 'Reporting calendar', icon: CalendarDays },
-  { section: 'documents', title: 'Evidence workspace', icon: FolderOpen },
-  { section: 'reviews', title: 'Review history', icon: ShieldCheck },
+type NavItem = { section: DashboardSection; title: string; icon: typeof LayoutDashboard }
+const navGroups: { label?: string; items: NavItem[] }[] = [
+  { items: [{ section: 'overview', title: 'Overview', icon: LayoutDashboard }] },
+  { label: 'WRITE', items: [{ section: 'draft', title: 'Proposal draft', icon: FileText }, { section: 'proposal', title: 'Proposal review', icon: ClipboardCheck }] },
+  { label: 'EVIDENCE', items: [{ section: 'intake', title: 'Project documents', icon: FolderOpen }, { section: 'documents', title: 'Evidence workspace', icon: BookOpenText }] },
+  { label: 'TRACK', items: [{ section: 'issues', title: 'Issues', icon: CircleAlert }, { section: 'calendar', title: 'Reporting calendar', icon: CalendarDays }] },
 ]
+const nav = navGroups.flatMap((group) => group.items)
+// Older sections that now live inside another page: Review history is the Decisions tab of Issues,
+// and Obligations are shown in the Reporting calendar.
+const navParent: Partial<Record<DashboardSection, DashboardSection>> = { reviews: 'issues', obligations: 'calendar' }
+const activeNav = (section: DashboardSection) => navParent[section] ?? section
 
 function formatDate(value: string) {
   const parsed = new Date(`${value.slice(0, 10)}T12:00:00Z`)
@@ -103,6 +105,7 @@ export function Dashboard({ section, onNavigate, onExit, onProjects, theme, onTo
   const [projects, setProjects] = useState<ProjectSummary[]>([])
   const [projectId, setProjectId] = useState(() => { try { return window.localStorage.getItem('grantguard.project') || 'taps-for-rights' } catch { return 'taps-for-rights' } })
   const [newProjectOpen, setNewProjectOpen] = useState(false)
+  const [renameOpen, setRenameOpen] = useState(false)
   const [projectMenuOpen, setProjectMenuOpen] = useState(false)
   const [proposal, setProposal] = useState<ProposalWorkspace>(emptyProposalWorkspace)
   const [proposalAvailable, setProposalAvailable] = useState(false)
@@ -203,11 +206,21 @@ export function Dashboard({ section, onNavigate, onExit, onProjects, theme, onTo
   const focusedInvestigation = focus?.kind === 'investigation' ? investigations.find((item) => item.id === focus.id) : undefined
   const focusedEvidence = focusedFinding?.evidence ?? focusedRequirement?.evidence ?? []
   const dates = useMemo(() => requirements.filter((item) => item.dueOn).sort((a, b) => (a.dueOn ?? '').localeCompare(b.dueOn ?? '')), [requirements])
-  const currentReviewCount = findings.filter((item) => { const review = latestReviewFor(item.id, reviews); return review?.fingerprint === evidenceFingerprint(item) }).length
+  const proposalFindingIds = useMemo(() => new Set(proposal.findings.map((item) => item.id)), [proposal.findings])
+  const issueFindings = useMemo(() => { const seen = new Set<string>(); return [...findings, ...proposal.findings].filter((item) => !seen.has(item.id) && Boolean(seen.add(item.id))) }, [findings, proposal.findings])
+  const currentReviewCount = issueFindings.filter((item) => { const review = latestReviewFor(item.id, reviews); return review?.fingerprint === evidenceFingerprint(item) }).length
+  const pendingIssueCount = issueFindings.length - currentReviewCount
+  const undatedRequirements = requirements.filter((item) => !item.dueOn)
+  // The draft lives in this browser; re-read it whenever Overview is shown.
+  const draftSummary = useMemo(() => {
+    if (section !== 'overview') return null
+    const saved = loadDraft('taps-for-rights', 'Taps for Rights')
+    const words = saved.sections.reduce((total, item) => total + (item.body.trim() ? item.body.trim().split(/\s+/).length : 0), 0)
+    return { pages: saved.sections.length, words }
+  }, [section])
   const projectName = projects.find((p) => p.projectId === projectId)?.name ?? 'Taps for Rights'
   const filteredDocuments = uploadedAsDocs.filter((item) => `${item.title} ${item.category}`.toLowerCase().includes(search.toLowerCase()))
-  const filteredFindings = findings.filter((item) => `${item.title} ${item.summary}`.toLowerCase().includes(search.toLowerCase()))
-  const filteredRequirements = requirements.filter((item) => `${item.title} ${item.statement}`.toLowerCase().includes(search.toLowerCase()))
+  const filteredFindings = issueFindings.filter((item) => `${item.title} ${item.summary}`.toLowerCase().includes(search.toLowerCase()))
 
   function navigate(next: DashboardSection) {
     setMobileNav(false)
@@ -224,6 +237,25 @@ export function Dashboard({ section, onNavigate, onExit, onProjects, theme, onTo
     setSelectedExcerpt(undefined)
     setFocus(null)
     setAnswer(null)
+  }
+
+  async function submitRename(name: string) {
+    const renamed = await renameProject(projectId, name)
+    setProjects((list) => list.some((p) => p.projectId === renamed.projectId) ? list.map((p) => p.projectId === renamed.projectId ? renamed : p) : [...list, renamed])
+    setRenameOpen(false)
+    setNotice(`Project renamed to ${renamed.name}`)
+  }
+
+  async function removeCurrentProject() {
+    const current = projects.find((p) => p.projectId === projectId) ?? { name: projectName, documentCount: uploadedDocs.length }
+    if (!confirmProjectDelete(current)) return
+    try {
+      await deleteProject(projectId)
+      const remaining = projects.filter((p) => p.projectId !== projectId)
+      setProjects(remaining)
+      changeProject(remaining[0]?.projectId ?? 'taps-for-rights')
+      setNotice(`Deleted ${current.name}`)
+    } catch (error) { setNotice(error instanceof Error ? `Could not delete: ${error.message}` : 'Could not delete the project.') }
   }
 
   async function submitNewProject(name: string) {
@@ -347,17 +379,18 @@ export function Dashboard({ section, onNavigate, onExit, onProjects, theme, onTo
           <button type="button" className="sidebar-case-cover" aria-label="Close project menu" onClick={() => setProjectMenuOpen(false)} />
           <div className="sidebar-case-menu" role="menu">
             <button type="button" className="sidebar-case-new" onClick={() => { setProjectMenuOpen(false); setNewProjectOpen(true) }}><Plus size={15} /> New project</button>
+            <button type="button" className="sidebar-case-rename" disabled={connection.mode !== 'connected'} title={connection.mode === 'connected' ? undefined : 'Connect the analysis service to rename projects'} onClick={() => { setProjectMenuOpen(false); setRenameOpen(true) }}><Pencil size={14} /> Rename “{projectName}”</button>
+            <button type="button" className="sidebar-case-rename danger" disabled={connection.mode !== 'connected'} onClick={() => { setProjectMenuOpen(false); void removeCurrentProject() }}><Trash2 size={14} /> Delete project</button>
             {projects.map((item) => <button type="button" role="menuitemradio" aria-checked={item.projectId === projectId} key={item.projectId} className={`sidebar-case-item ${item.projectId === projectId ? 'active' : ''}`} onClick={() => { changeProject(item.projectId); setProjectMenuOpen(false) }}><span><strong>{item.name}</strong><small>{item.documentCount} document{item.documentCount === 1 ? '' : 's'}</small></span>{item.projectId === projectId && <Check size={15} />}</button>)}
           </div>
         </>}
       </div>
-      <span className="sidebar-caption">WORKSPACE</span>
-      <nav aria-label="Dashboard navigation">{nav.map(({ section: target, title, icon: Icon }) => <button type="button" key={target} className={`dashboard-nav-item ${section === target ? 'active' : ''}`} onClick={() => navigate(target)} aria-label={title} title={title} aria-current={section === target ? 'page' : undefined}><Icon size={18} /><span>{title}</span>{target === 'issues' && findings.length > 0 && <em>{findings.length}</em>}{target === 'proposal' && proposal.checklist.length > 0 && <em>{proposal.checklist.length}</em>}</button>)}</nav>
-      <div className="sidebar-bottom"><span className="sidebar-divider" /><span className="sidebar-caption">CASE VIEW</span><p>Historical scenario<br /><strong>{formatDate(connection.data.asOf)}</strong></p></div>
+      <nav aria-label="Dashboard navigation">{navGroups.map((group, index) => <div className="nav-group" key={group.label ?? index} role="group" aria-label={group.label ? group.label.toLowerCase() : 'start'}>{group.label && <span className="sidebar-caption">{group.label}</span>}{group.items.map(({ section: target, title, icon: Icon }) => { const active = activeNav(section) === target; return <button type="button" key={target} className={`dashboard-nav-item ${active ? 'active' : ''}`} onClick={() => navigate(target)} aria-label={title} title={title} aria-current={active ? 'page' : undefined}><Icon size={18} /><span>{title}</span>{target === 'issues' && pendingIssueCount > 0 && <em>{pendingIssueCount}</em>}{target === 'proposal' && proposal.checklist.length > 0 && <em>{proposal.checklist.length}</em>}</button> })}</div>)}</nav>
+      <footer className="sidebar-bottom"><span className="sidebar-divider" /><p title="Historical scenario: dates are read as of this day"><span className="sidebar-caption">CASE DATE</span><strong>{formatDate(connection.data.asOf)}</strong></p></footer>
     </aside>
 
     <div className="dashboard-body">
-      <header className="dashboard-topbar"><button className="dashboard-mobile-menu" type="button" onClick={() => setMobileNav(true)} aria-label="Open navigation"><Menu size={21} /></button><span className="dashboard-crumb">Workspace <ChevronRight size={15} /> <strong>{nav.find((item) => item.section === section)?.title}</strong></span><div className="dashboard-topbar-actions"><span className={`service-state ${connection.mode === 'connected' ? 'connected' : ''}`}><i /> {connection.mode === 'connected' ? 'Analysis connected' : connection.mode === 'unavailable' ? 'Service unavailable' : 'Source pack preview'}</span><ThemeToggle theme={theme} onToggle={onToggleTheme} /></div></header>
+      <header className="dashboard-topbar"><button className="dashboard-mobile-menu" type="button" onClick={() => setMobileNav(true)} aria-label="Open navigation"><Menu size={21} /></button><span className="dashboard-crumb">Workspace <ChevronRight size={15} /> <strong>{nav.find((item) => item.section === activeNav(section))?.title}</strong></span><div className="dashboard-topbar-actions"><span className={`service-state ${connection.mode === 'connected' ? 'connected' : ''}`}><i /> {connection.mode === 'connected' ? 'Analysis connected' : connection.mode === 'unavailable' ? 'Service unavailable' : 'Source pack preview'}</span><ThemeToggle theme={theme} onToggle={onToggleTheme} /></div></header>
 
       <main className={`dashboard-main dashboard-${section}`}>
         {section === 'intake' && <BackendDocuments projectId={projectId} projectName={projectName} connected={connection.mode === 'connected'} />}
@@ -379,24 +412,22 @@ export function Dashboard({ section, onNavigate, onExit, onProjects, theme, onTo
         {section === 'overview' && <>
           <SectionHeading eyebrow="CASE OVERVIEW / 30 JUNE 2022" title="What needs attention?" subtitle="One place to ask, inspect, and decide—grounded in the original grant documents." />
           <div className="overview-feature"><div><span className="overview-feature-kicker"><MessageSquareText size={16} /> START HERE</span><h2>Ask while you<br />read the source.</h2><p>Trace the answer to its source, or see where the evidence is missing.</p><button className="solid-button" type="button" onClick={openAssistant}>Open evidence workspace <ArrowRight size={17} /></button></div><div className="overview-feature-art" aria-hidden="true"><div><span>QUESTION</span><strong>When is the final report due?</strong></div><div><span>SOURCE</span><strong>Agreement · cited page</strong></div><div><span>REVIEW</span><strong>Human decision required</strong></div></div></div>
-          <div className="overview-stats"><div><span>Source files</span><strong>{String(documents.length).padStart(2, '0')}</strong><small>Original pack available</small></div><div><span>Issues to review</span><strong>{String(findings.length).padStart(2, '0')}</strong><small>{findings.length ? 'From the shared finding store' : 'No findings loaded yet'}</small></div><div><span>Current reviews</span><strong>{String(currentReviewCount).padStart(2, '0')}</strong><small>Matched to current findings</small></div></div>
+          <div className="overview-stats"><div><span>Source files</span><strong>{String(documents.length).padStart(2, '0')}</strong><small>Original pack available</small></div><div><span>Issues to review</span><strong>{String(pendingIssueCount).padStart(2, '0')}</strong><small>{issueFindings.length ? `${issueFindings.length} found · ${currentReviewCount} decided` : 'No findings loaded yet'}</small></div><div><span>Current reviews</span><strong>{String(currentReviewCount).padStart(2, '0')}</strong><small>Matched to current findings</small></div></div>
           {connection.mode !== 'connected' && <div className="clean-banner"><FileQuestion size={20} /><div><strong>{connection.mode === 'unavailable' ? 'Analysis service unavailable' : 'Source pack preview'}</strong><p>{connection.mode === 'unavailable' ? connection.message : 'The documents are ready to inspect. Answers and findings will appear when the team’s analysis service is connected.'}</p></div></div>}
-          <div className="overview-links"><button type="button" onClick={() => navigate('proposal')}><ClipboardCheck size={20} /><span><strong>Check the proposal</strong><small>Call checklist and Q5, Q21, Q23</small></span><ArrowUpRight size={17} /></button><button type="button" onClick={() => navigate('issues')}><CircleAlert size={20} /><span><strong>Review issues</strong><small>Findings and guide questions</small></span><ArrowUpRight size={17} /></button><button type="button" onClick={() => navigate('documents')}><FolderOpen size={20} /><span><strong>Open evidence workspace</strong><small>Seven original files and AI panel</small></span><ArrowUpRight size={17} /></button></div>
+          <div className="overview-links"><button type="button" className="overview-link-primary" onClick={() => navigate('draft')}><FileText size={20} /><span><strong>{draftSummary?.words ? 'Continue the proposal draft' : 'Start the proposal draft'}</strong><small>{draftSummary?.words ? `${draftSummary.pages} page${draftSummary.pages === 1 ? '' : 's'} · ${draftSummary.words.toLocaleString()} words · saved in this browser` : 'Template or case proposal, with cited writing help'}</small></span><ArrowUpRight size={17} /></button><button type="button" onClick={() => navigate('proposal')}><ClipboardCheck size={20} /><span><strong>Check the proposal</strong><small>Call checklist and Q5, Q21, Q23</small></span><ArrowUpRight size={17} /></button><button type="button" onClick={() => navigate('issues')}><CircleAlert size={20} /><span><strong>Review issues</strong><small>Findings and guide questions</small></span><ArrowUpRight size={17} /></button><button type="button" onClick={() => navigate('documents')}><FolderOpen size={20} /><span><strong>Open evidence workspace</strong><small>Seven original files and AI panel</small></span><ArrowUpRight size={17} /></button></div>
         </>}
 
-        {section === 'issues' && <>
-          <SectionHeading eyebrow="FINDINGS / HUMAN REVIEW" title="Issues to review." subtitle="Every issue should explain the concern and preserve its source trail." aside={<span className="heading-count">{findings.length} findings</span>} />
-          {findings.length ? <><label className="dashboard-search"><Search size={18} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search issues" /></label><div className="clean-list">{filteredFindings.map((item) => { const review = latestReviewFor(item.id, reviews); const current = review?.fingerprint === evidenceFingerprint(item); return <button type="button" key={item.id} onClick={() => openFinding(item)}><span className="list-icon"><CircleAlert size={19} /></span><span className="list-copy"><small>{item.kind.replaceAll('_', ' ')} · {item.evidence.length} cited source{item.evidence.length === 1 ? '' : 's'}</small><strong>{item.title}</strong><span>{item.summary}</span></span><span className="row-status">{current ? decisionLabel(review.decision) : review ? 'Review stale' : item.state.replaceAll('_', ' ')}</span><ChevronRight size={18} /></button> })}{filteredFindings.length === 0 && <p className="no-results">No matching issues.</p>}</div></> : <><EmptyState icon={CircleAlert} title="No findings loaded yet" description="The shared finding store has not returned reviewable issues. The source pack is available while the backend work continues." action={<button className="outline-button" type="button" onClick={() => navigate('documents')}>Browse the source pack <ArrowRight size={16} /></button>} /><div className="guide-list"><span className="dashboard-eyebrow">GUIDE QUESTIONS · NOT FINDINGS</span>{investigations.map((item) => <button type="button" key={item.id} onClick={() => openInvestigation(item)}><span>{String(item.questionNumber).padStart(2, '0')}</span><strong>{item.title}</strong><small>{item.description}</small><ChevronRight size={17} /></button>)}</div></>}
+        {(section === 'issues' || section === 'reviews') && <>
+          <SectionHeading eyebrow="FINDINGS / HUMAN REVIEW" title={section === 'reviews' ? 'Decisions on issues.' : 'Issues to review.'} subtitle={section === 'reviews' ? 'Staff decisions are kept separate from generated findings and checked against the current source trail.' : 'Findings from the compliance and proposal checks. Each one keeps its source trail and waits for a staff decision.'} aside={<span className="heading-count">{section === 'reviews' ? `${reviews.length} recorded` : `${pendingIssueCount} to review`}</span>} />
+          <div className="issue-tabs" role="tablist" aria-label="Issues"><button type="button" role="tab" aria-selected={section === 'issues'} className={section === 'issues' ? 'active' : ''} onClick={() => navigate('issues')}>To review <em>{pendingIssueCount}</em></button><button type="button" role="tab" aria-selected={section === 'reviews'} className={section === 'reviews' ? 'active' : ''} onClick={() => navigate('reviews')}>Decisions <em>{reviews.length}</em></button></div>
+          {section === 'issues' && (issueFindings.length ? <><label className="dashboard-search"><Search size={18} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search issues" /></label><div className="clean-list">{filteredFindings.map((item) => { const review = latestReviewFor(item.id, reviews); const current = review?.fingerprint === evidenceFingerprint(item); return <button type="button" key={item.id} onClick={() => openFinding(item)}><span className="list-icon"><CircleAlert size={19} /></span><span className="list-copy"><small>{proposalFindingIds.has(item.id) ? 'Proposal check' : 'Compliance'} · {item.kind.replaceAll('_', ' ')} · {item.evidence.length} cited source{item.evidence.length === 1 ? '' : 's'}</small><strong>{item.title}</strong><span>{item.summary}</span></span><span className="row-status">{current ? decisionLabel(review.decision) : review ? 'Review stale' : item.state.replaceAll('_', ' ')}</span><ChevronRight size={18} /></button> })}{filteredFindings.length === 0 && <p className="no-results">No matching issues.</p>}</div></> : <><EmptyState icon={CircleAlert} title="No findings loaded yet" description="The shared finding store has not returned reviewable issues. The source pack is available while the backend work continues." action={<button className="outline-button" type="button" onClick={() => navigate('documents')}>Browse the source pack <ArrowRight size={16} /></button>} /><div className="guide-list"><span className="dashboard-eyebrow">GUIDE QUESTIONS · NOT FINDINGS</span>{investigations.map((item) => <button type="button" key={item.id} onClick={() => openInvestigation(item)}><span>{String(item.questionNumber).padStart(2, '0')}</span><strong>{item.title}</strong><small>{item.description}</small><ChevronRight size={17} /></button>)}</div></>)}
+          {section === 'reviews' && (reviews.length ? <div className="review-history">{[...reviews].reverse().map((record) => { const match = issueFindings.find((item) => item.id === record.findingId); const stale = !match || record.fingerprint !== evidenceFingerprint(match); return <article key={record.id}><span className="list-icon"><ClipboardCheck size={18} /></span><div><div><strong>{record.findingTitle}</strong><span className={`review-badge ${stale ? 'stale' : ''}`}>{!match ? 'Finding unavailable' : stale ? 'Finding changed' : decisionLabel(record.decision)}</span></div><p>{record.note || record.correctedValue || 'No note added.'}</p><small>{new Date(record.recordedAt).toLocaleString()} · Stored in this browser</small>{match && <button type="button" className="review-open" onClick={() => openFinding(match)}>Open issue <ArrowRight size={13} /></button>}</div></article> })}</div> : <EmptyState icon={ClipboardCheck} title="No decisions recorded yet" description="Open a cited finding to confirm, correct, dismiss, escalate, or request clarification. Your decision will appear here." />)}
         </>}
 
-        {section === 'obligations' && <>
-          <SectionHeading eyebrow="REQUIREMENTS REGISTER" title="Obligations." subtitle="A concise register of extracted requirements, each linked to its source." aside={<span className="heading-count">{requirements.length} extracted</span>} />
-          {requirements.length ? <><label className="dashboard-search"><Search size={18} /><input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Search obligations" /></label><div className="clean-list">{filteredRequirements.map((item) => <button type="button" key={item.id} onClick={() => openRequirement(item)}><span className="list-icon"><BookOpenText size={19} /></span><span className="list-copy"><small>{item.category} · {item.status.replaceAll('_', ' ')}</small><strong>{item.title}</strong><span>{item.statement}</span></span><span className="row-status">{item.dueOn ? formatDate(item.dueOn) : 'No date'}</span><ChevronRight size={18} /></button>)}{filteredRequirements.length === 0 && <p className="no-results">No matching obligations.</p>}</div></> : <EmptyState icon={BookOpenText} title="No obligations extracted yet" description="When the analysis service returns cited obligations, they will appear here with their original source references." action={<button className="outline-button" type="button" onClick={() => navigate('documents')}>Inspect source files <ArrowRight size={16} /></button>} />}
-        </>}
-
-        {section === 'calendar' && <>
+        {(section === 'calendar' || section === 'obligations') && <>
           <SectionHeading eyebrow="REPORTING CALENDAR" title="Dates from the sources." subtitle={dates.length ? 'Dates appear here only when attached to a cited obligation. Conflicting dates stay in the issues view.' : 'Pick a date to see which reports fall due. Sample schedule from the agreement until the backend returns cited obligations.'} aside={<span className="heading-count">{dates.length ? `${dates.length} sourced dates` : 'Sample schedule'}</span>} />
           {dates.length ? <div className="calendar-list">{dates.map((item) => <button type="button" key={item.id} onClick={() => openRequirement(item)}><span className="calendar-date">{formatDate(item.dueOn!)}</span><span><strong>{item.title}</strong><small>{item.category} · {item.evidence.length} source{item.evidence.length === 1 ? '' : 's'}</small></span><ChevronRight size={17} /></button>)}</div> : <ReportingCalendar asOf={connection.data.asOf} onOpenSource={openCitation} />}
+          {undatedRequirements.length > 0 && <div className="calendar-undated"><span className="dashboard-eyebrow">OBLIGATIONS WITHOUT A FIXED DATE</span><div className="clean-list">{undatedRequirements.map((item) => <button type="button" key={item.id} onClick={() => openRequirement(item)}><span className="list-icon"><BookOpenText size={19} /></span><span className="list-copy"><small>{item.category} · {item.status.replaceAll('_', ' ')}</small><strong>{item.title}</strong><span>{item.statement}</span></span><ChevronRight size={18} /></button>)}</div></div>}
         </>}
 
         {section === 'documents' && <>
@@ -413,14 +444,11 @@ export function Dashboard({ section, onNavigate, onExit, onProjects, theme, onTo
           </div>
         </>}
 
-        {section === 'reviews' && <>
-          <SectionHeading eyebrow="HUMAN DECISIONS" title="Review history." subtitle="Staff decisions are kept separate from generated findings and checked against the current source trail." aside={<span className="heading-count">{reviews.length} recorded</span>} />
-          {reviews.length ? <div className="review-history">{[...reviews].reverse().map((record) => { const match = findings.find((item) => item.id === record.findingId); const stale = !match || record.fingerprint !== evidenceFingerprint(match); return <article key={record.id}><span className="list-icon"><ClipboardCheck size={18} /></span><div><div><strong>{record.findingTitle}</strong><span className={`review-badge ${stale ? 'stale' : ''}`}>{!match ? 'Finding unavailable' : stale ? 'Finding changed' : decisionLabel(record.decision)}</span></div><p>{record.note || record.correctedValue || 'No note added.'}</p><small>{new Date(record.recordedAt).toLocaleString()} · Stored in this browser</small></div></article> })}</div> : <EmptyState icon={ClipboardCheck} title="No decisions recorded yet" description="Open a cited finding to confirm, correct, dismiss, escalate, or request clarification. Your decision will appear here." />}
-        </>}
-      </main>
+              </main>
     </div>
     {reviewFinding && <ReviewDialog finding={reviewFinding} onClose={() => setReviewFinding(null)} onSave={saveReview} />}
     {newProjectOpen && <NewProjectDialog onClose={() => setNewProjectOpen(false)} onCreate={submitNewProject} />}
+    {renameOpen && <NewProjectDialog initialName={projectName} onClose={() => setRenameOpen(false)} onCreate={submitRename} />}
     {notice && <div className="dashboard-toast" role="status"><CheckCircle2 size={17} />{notice}<button type="button" onClick={() => setNotice('')} aria-label="Dismiss notice"><X size={16} /></button></div>}
   </div>
 }
