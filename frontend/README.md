@@ -1,6 +1,6 @@
-# GrantGuard frontend
+# GrantProof frontend
 
-GrantGuard has a landing page, a project hub, and a React/Vite evidence workspace for the A6 prototype. Its restrained editorial visual system has light and dark modes. It uses the local source pack in `../assets/` and does not generate grant findings on its own.
+GrantProof has a landing page, a project hub, and a React/Vite evidence workspace for the A6 prototype. Its restrained editorial visual system has light and dark modes. It uses the local source pack in `../assets/` and does not generate grant findings on its own.
 
 ## Run
 

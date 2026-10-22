@@ -1,5 +1,6 @@
 import { ArrowRight, ArrowUpRight, BookOpenText, Check, FileText, Layers3, ShieldCheck } from 'lucide-react'
 import { BrandMark } from './Brand'
+import { APP_NAME } from './product'
 import { ThemeToggle } from './components/ThemeToggle'
 import type { Theme } from './theme'
 
@@ -19,7 +20,7 @@ function WaveField() {
 export function LandingPage({ onEnter, theme, onToggleTheme }: Props) {
   return <div className="landing">
     <header className="landing-header">
-      <a className="landing-brand" href="#top" aria-label="GrantGuard home"><BrandMark /><span>GrantGuard</span><small>ALPHA</small></a>
+      <a className="landing-brand" href="#top" aria-label={`${APP_NAME} home`}><BrandMark /><span>{APP_NAME}</span><small>ALPHA</small></a>
       <nav aria-label="Landing navigation"><a href="#how-it-works">How it works</a><a href="#workspace-preview">Workspace</a></nav>
       <div className="landing-header-actions"><ThemeToggle theme={theme} onToggle={onToggleTheme} /><button className="landing-header-cta" type="button" onClick={onEnter}>Explore projects <ArrowUpRight size={16} /></button></div>
     </header>
@@ -40,7 +41,7 @@ export function LandingPage({ onEnter, theme, onToggleTheme }: Props) {
         <div className="landing-section-heading"><div><span className="landing-kicker">THE WORKSPACE</span><h2 id="preview-heading">A clearer path from<br />document to decision.</h2></div><p>Start with a question. Open the relevant source. Keep the human decision visible.</p></div>
         <div className="preview-stage">
           <div className="preview-window">
-            <div className="preview-window-top"><span><BrandMark /> GrantGuard</span><span className="preview-window-dots"><i /><i /><i /></span></div>
+            <div className="preview-window-top"><span><BrandMark /> {APP_NAME}</span><span className="preview-window-dots"><i /><i /><i /></span></div>
             <div className="preview-window-body">
               <div className="preview-mini-nav"><strong>Taps for Rights</strong><span>Overview</span><span className="active">Evidence workspace</span><span>Issues</span><span>Obligations</span><span>Review history</span></div>
               <div className="preview-document">
@@ -63,8 +64,8 @@ export function LandingPage({ onEnter, theme, onToggleTheme }: Props) {
       </section>
 
       <section className="landing-principle"><div><span className="landing-kicker">OUR PRINCIPLE</span><h2>Sources for truth.<br /><em>People for decisions.</em></h2></div><div className="principle-list"><p><Check size={18} /> Every finding needs a traceable citation.</p><p><Check size={18} /> Conflicts stay visible until a person resolves them.</p><p><Check size={18} /> Missing evidence is named, never filled in.</p></div></section>
-      <section className="landing-final"><span className="landing-kicker">YOUR NEXT STEP</span><h2>Less searching.<br />More clarity.</h2><button className="hero-cta" type="button" onClick={onEnter}>Open GrantGuard <ArrowRight size={19} /></button></section>
+      <section className="landing-final"><span className="landing-kicker">YOUR NEXT STEP</span><h2>Less searching.<br />More clarity.</h2><button className="hero-cta" type="button" onClick={onEnter}>Open {APP_NAME} <ArrowRight size={19} /></button></section>
     </main>
-    <footer className="landing-footer"><span><BrandMark /> GrantGuard</span><p>WaterAid Canada Challenge A6 · Synthetic Water Care case</p><span>Evidence first. Human reviewed.</span></footer>
+    <footer className="landing-footer"><span><BrandMark /> {APP_NAME}</span><p>WaterAid Canada Challenge A6 · Synthetic Water Care case</p><span>Evidence first. Human reviewed.</span></footer>
   </div>
 }

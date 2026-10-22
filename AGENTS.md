@@ -6,7 +6,7 @@ The Python app lives in `backend/` (`api/`, `core/`, `tools/`, `tests/`, `pyproj
 
 ## What we are building
 
-**GrantGuard** is a one-day prototype for WaterAid Canada Challenge A6. The supplied hackathon case is a **fictional Water Care** project called *Taps for Rights*; do not describe its facts as real WaterAid activity. The goal is to help grant staff see requirements, reported results, conflicts, and due dates with evidence they can inspect. The assistant flags issues; staff make decisions.
+**GrantProof** (working name; formerly GrantGuard) is a one-day prototype for WaterAid Canada Challenge A6. The supplied hackathon case is a **fictional Water Care** project called *Taps for Rights*; do not describe its facts as real WaterAid activity. The goal is to help grant staff see requirements, reported results, conflicts, and due dates with evidence they can inspect. The assistant flags issues; staff make decisions.
 
 The participant guide, `assets/00_Start_Here_A6_Taps_for_Rights.pdf`, is the challenge source of truth. It says depth beats breadth, sets the case date to **30 June 2022**, and lists 25 judge questions on page 3. Read it before planning a feature. Never hardcode its answers into product code.
 

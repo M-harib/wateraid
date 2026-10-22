@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { ArrowLeft, ArrowRight, ArrowUpRight, FileText, FolderOpen, Plus, Trash2, X } from 'lucide-react'
 import { BrandMark } from './Brand'
+import { APP_NAME } from './product'
 import { ThemeToggle } from './components/ThemeToggle'
 import { DraftWorkspace } from './components/DraftWorkspace'
 import { ProjectDocuments } from './components/ProjectDocuments'
@@ -57,7 +58,7 @@ export function ProjectsPage({ projectId, projectSection, onHome, onOpenDemo, on
   }
 
   return <div className="projects-page">
-    <header className="projects-topbar"><button type="button" className="projects-brand" onClick={onHome}><BrandMark /> GrantGuard</button><div className="projects-topbar-actions"><span>Personal workspace <small>Browser preview</small></span><ThemeToggle theme={theme} onToggle={onToggleTheme} /></div></header>
+    <header className="projects-topbar"><button type="button" className="projects-brand" onClick={onHome}><BrandMark /> {APP_NAME}</button><div className="projects-topbar-actions"><span>Personal workspace <small>Browser preview</small></span><ThemeToggle theme={theme} onToggle={onToggleTheme} /></div></header>
     <main className={`projects-main ${projectId && project ? 'projects-main-draft' : ''}`}>
       {projectId ? project ? <>
         <button className="projects-back" type="button" onClick={onProjects}><ArrowLeft size={16} /> All projects</button>
