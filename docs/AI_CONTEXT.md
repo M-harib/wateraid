@@ -2,7 +2,7 @@
 
 ## Project
 
-**GrantGuard** is the working name for a one-day WaterAid Canada Challenge A6 prototype. The supplied pack is a fictional **Water Care / Taps for Rights** case. File `00` confirms the case date, core pack, and judge questions; verify any grant-specific clause or claim in its original file before using it.
+**GrantProof** (formerly GrantGuard) is the working name for a one-day WaterAid Canada Challenge A6 prototype. The supplied pack is a fictional **Water Care / Taps for Rights** case. File `00` confirms the case date, core pack, and judge questions; verify any grant-specific clause or claim in its original file before using it.
 
 ## User problem
 

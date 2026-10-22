@@ -62,7 +62,7 @@ uv run --env-file .env python -m tools.proposal
 uv run --env-file .env python -m tools.proposal --view checklist
 uv run --env-file .env python -m tools.proposal --view quality
 uv run --env-file .env python -m tools.proposal --question "Which claims need substantiation?"
-uv run --env-file .env python -m tools.proposal --output "$env:TEMP/grantguard-proposal.json"
+uv run --env-file .env python -m tools.proposal --output "$env:TEMP/grantproof-proposal.json"
 uv run pytest -q
 uv run --env-file .env python -m tests.eval.run_proposal
 ```

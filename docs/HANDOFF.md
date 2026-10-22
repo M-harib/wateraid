@@ -129,6 +129,21 @@ Combine `main` (teammate's backend + proposal review, through `f6b342c`) with th
   - Live checks are listed in the commit and PR.
 - **Setup note:** the root `.venv` needs `python-multipart==0.0.32` (added in #8). Run the backend from `backend/`.
 
+## Product renamed to GrantProof (working name) (Claude), branch `feat/rename-grantproof`
+- **Why:** "GrantGuard" was retired because grantguard.ai is an existing product of the same kind. "GrantProof" is provisional, and the team may rename again later.
+- **One place for the name:** `frontend/src/product.ts` (`APP_NAME`, `APP_TAGLINE`, `APP_DESCRIPTION`).
+  - The landing page, Projects header, dashboard sidebar and screen-reader labels read it.
+  - `index.html` gets the title and description at build time through a small plugin in `frontend/vite.config.ts`.
+  - The file is not `brand.ts`, because macOS's case-insensitive file system made it collide with `Brand.tsx`.
+- **New mark:** a page with a folded corner and a check (`frontend/src/Brand.tsx`), replacing the water droplet now that the product isn't water-specific. The favicon was redrawn on `--button` `#20242b`, which also fixes the old teal favicon noted in BRAND.md.
+- **Docs updated:** `docs/BRAND.md` (logo section and name status), `AGENTS.md`, `docs/AI_CONTEXT.md` and `frontend/README.md`. The frontend package name is now `grantproof-frontend`.
+- **Kept on purpose:** the `grantguard.*` localStorage keys, the `grantguard.project-documents.v1` IndexedDB name and the `application/x-grantguard-*` drag types. Renaming them would orphan saved drafts, reviews, projects and theme choices; change them only together with a migration.
+- **To rename again:** edit `product.ts`, then the docs listed above. If the new name needs a different mark, replace `Brand.tsx` and `public/favicon.svg`.
+- **Verified:**
+  - `npm run build` passes; `dist/index.html` has the title "GrantProof · Evidence-first grant workspace".
+  - Playwright (Chrome): landing, Projects and sidebar show GrantProof, and the mark renders in light and dark.
+  - No console errors.
+
 ## Open issues (Claude)
 
 - **Backend, for the proposal owner:** "Cost Share Vs Call" failed in all 3 full runs (`tools/proposal/evidence.py` `cited_percentage` rejects quotes with zero or several percentages); the checklist failed once with "Response must be a finite JSON object"; checklist row count varies (14 vs 16). Every `/proposal/ask` is stored as a proposal finding, so writing-help requests appear as "Generic Qa" priority findings.

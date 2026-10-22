@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { ArrowRight, ArrowUpRight, BookOpenText, CalendarDays, Check, CheckCircle2, ChevronRight, CircleAlert, ClipboardCheck, FileQuestion, FileSpreadsheet, FileText, FolderOpen, LayoutDashboard, Menu, MessageSquareText, PanelLeftClose, PanelLeftOpen, Plus, Search, ShieldCheck, X } from 'lucide-react'
 import { askProjectQuestion, askProposalQuestion, createProject, loadDashboard, loadProjectDocuments, loadProjects, loadProposalRunStatus, loadProposalWorkspace, projectDocumentFileUrl, runProposalChecks, type AskAnswer, type DashboardConnection, type ProjectDocument, type ProjectSummary, type ProposalRunStatus } from './api'
 import { BrandMark } from './Brand'
+import { APP_NAME } from './product'
 import { ReviewDialog } from './components/ReviewDialog'
 import { NewProjectDialog } from './components/NewProjectDialog'
 import { AskPanel } from './components/AskPanel'
@@ -338,7 +339,7 @@ export function Dashboard({ section, onNavigate, onExit, onProjects, theme, onTo
   return <div className={`dashboard-shell ${sidebarCollapsed ? 'is-sidebar-collapsed' : ''}`}>
     {mobileNav && <button className="mobile-nav-cover" type="button" onClick={() => setMobileNav(false)} aria-label="Close navigation" />}
     <aside className={`dashboard-sidebar ${mobileNav ? 'is-open' : ''}`}>
-      <div className="sidebar-header"><button className="dashboard-brand" type="button" onClick={onExit} aria-label="GrantGuard home" title="GrantGuard home"><BrandMark /><span>GrantGuard</span></button><button type="button" className="sidebar-collapse-toggle" onClick={toggleSidebar} aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'} title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'} aria-expanded={!sidebarCollapsed}>{sidebarCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}</button></div>
+      <div className="sidebar-header"><button className="dashboard-brand" type="button" onClick={onExit} aria-label={`${APP_NAME} home`} title={`${APP_NAME} home`}><BrandMark /><span>{APP_NAME}</span></button><button type="button" className="sidebar-collapse-toggle" onClick={toggleSidebar} aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'} title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'} aria-expanded={!sidebarCollapsed}>{sidebarCollapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}</button></div>
       <button type="button" className="sidebar-workspaces" onClick={onProjects} title="Workspaces"><FolderOpen size={19} /> <span>Workspaces</span></button>
       <div className="sidebar-case-wrap">
         <button className="sidebar-case" type="button" onClick={() => setProjectMenuOpen((open) => !open)} title="Switch project" aria-haspopup="menu" aria-expanded={projectMenuOpen}><span className="sidebar-case-monogram">{projectInitials(projectName)}</span><span><strong>{projectName}</strong><small>Switch project ▾</small></span></button>

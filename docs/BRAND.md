@@ -1,10 +1,10 @@
-# GrantGuard brand guide
+# GrantProof brand guide
 
-The look and voice of the GrantGuard frontend. It documents the water theme on `feat/water-theme` (`frontend/src/theme.css`) and marks additions that are **proposed** but not built yet. When code and this guide disagree, fix one of them in the same PR.
+The look and voice of the GrantProof frontend. It documents the water theme on `feat/water-theme` (`frontend/src/theme.css`) and marks additions that are **proposed** but not built yet. When code and this guide disagree, fix one of them in the same PR.
 
 ## 1. Character
 
-GrantGuard is an evidence desk for grant staff: calm, exact and trustworthy. Water appears as a quiet line motif, never as decoration that competes with the documents. The source page is always the most important thing on screen.
+GrantProof is an evidence desk for grant staff: calm, exact and trustworthy. Water appears as a quiet line motif, never as decoration that competes with the documents. The source page is always the most important thing on screen.
 
 Avoid the look we moved away from: black backgrounds with mint green, pixel or "signal" animations, all-caps monospace navigation. `design/design-3.png` and `design/design-4.png` show it; do not use them as references.
 
@@ -21,15 +21,16 @@ Avoid the look we moved away from: black backgrounds with mint green, pixel or "
 Formats:
 - **Dates:** `15 May 2023` in the UI, ISO `2023-05-15` in data.
 - **Locators:** `03 · App. D §4.12 · p.16` or `05 · PMF!E14`.
-- **Names:** use each source's own name (Water Care in the pack; GrantGuard for the product).
+- **Names:** use each source's own name (Water Care in the pack; GrantProof for the product).
 
 ## 3. Logo
 
-- **Mark:** a water droplet with an inner highlight stroke and two ripple lines (`BrandMark` in `frontend/src/Brand.tsx`). It sits on a `--button` tile with a 7px radius; the drop takes `--button-text`, the highlight takes `--mark-stroke`. Both swap correctly in dark mode.
-- **Wordmark:** "GrantGuard" in the UI font, `--ink`, letter-spacing about −0.05em, 10px from the mark. Weight is 680 on the landing and 750 on the project hub today; standardise on 700.
+- **Name status:** "GrantProof" is a working name. "GrantGuard" was retired because grantguard.ai is an existing product of the same kind. The UI and page title read the name from `frontend/src/product.ts` (`APP_NAME`, `APP_TAGLINE`, `APP_DESCRIPTION`), so a future rename is one file plus these docs. Browser storage keys keep the `grantguard.` prefix on purpose (see section 8).
+- **Mark:** a page with a folded corner and a check mark, meaning "checked against the source" (`BrandMark` in `frontend/src/Brand.tsx`). It sits on a `--button` tile with a 7px radius. The page takes `--button-text`; the fold and check take `--button`, so the mark reads correctly in both themes.
+- **Wordmark:** "GrantProof" in the UI font, `--ink`, letter-spacing about −0.05em, 10px from the mark. Weight is 680 on the landing and 750 on the project hub today; standardise on 700.
 - **Minimum size:** 24px tile. Keep clear space of half the tile width on every side.
 - **Don't:** recolour the mark green, add a gradient, outline it, or place it on a photo.
-- **Favicon (fix needed):** `public/favicon.svg` uses `#0e759f` / `#daf5ff`, a teal that appears nowhere else. Redraw it with `--button` (`#20242b`) and white, or with `--accent` (`#245ac2`) and white, so the tab matches the app.
+- **Favicon:** `public/favicon.svg` is the same mark on a `--button` (`#20242b`) tile with a white page, matching the app.
 
 ## 4. Colour
 
@@ -102,7 +103,7 @@ Large headings are light (500) with tight tracking; emphasis inside a heading us
 
 ## 8. Light and dark
 
-Light is the default. The toggle saves the choice in the browser (`grantguard.theme.v1`), and `index.html` applies it before React renders. Every new colour needs a dark value in `html[data-theme='dark']`. The PDF canvas always keeps the source document's own colours.
+Light is the default. The toggle saves the choice in the browser (`grantguard.theme.v1`; storage keys keep the original prefix so saved choices, drafts and reviews survive the rename), and `index.html` applies it before React renders. Every new colour needs a dark value in `html[data-theme='dark']`. The PDF canvas always keeps the source document's own colours.
 
 ## 9. Accessibility checklist
 
