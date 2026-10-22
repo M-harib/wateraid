@@ -91,3 +91,50 @@ def test_file_serve_and_delete(tmp_path, monkeypatch):
         assert c.delete(f"/projects/demo/documents/{doc_id}").status_code == 200
         assert c.get("/projects/demo/documents").json()["documents"] == []
         assert c.get(f"/projects/demo/documents/{doc_id}/file").status_code == 404
+
+
+def test_rename_project_keeps_id_and_persists(tmp_path, monkeypatch):
+    with _client(tmp_path, monkeypatch) as c:
+        created = c.post("/projects", json={"name": "Coastal WASH"}).json()
+        pid = created["projectId"]
+        r = c.patch(f"/projects/{pid}", json={"name": "  Coastal   WASH 2026 "})
+        assert r.status_code == 200
+        assert r.json() == {"projectId": pid, "name": "Coastal WASH 2026", "documentCount": 0, "ready": False}
+        assert {"projectId": pid, "name": "Coastal WASH 2026", "documentCount": 0, "ready": False} in c.get("/projects").json()["projects"]
+        assert c.patch(f"/projects/{pid}", json={"name": "   "}).status_code == 400
+        assert c.patch(f"/projects/{pid}", json={"name": "x" * 121}).status_code == 400
+    # A fresh app reloads the saved name from disk.
+    with _client(tmp_path, monkeypatch) as c:
+        assert any(p["projectId"] == pid and p["name"] == "Coastal WASH 2026" for p in c.get("/projects").json()["projects"])
+
+
+def test_rename_unlisted_project_creates_it_with_the_new_name(tmp_path, monkeypatch):
+    with _client(tmp_path, monkeypatch) as c:
+        assert c.patch("/projects/taps-for-rights", json={"name": "Taps for Rights"}).json()["name"] == "Taps for Rights"
+        assert [p["name"] for p in c.get("/projects").json()["projects"]] == ["Taps for Rights"]
+
+
+def test_delete_project_removes_its_files(tmp_path, monkeypatch):
+    with _client(tmp_path, monkeypatch) as c:
+        pid = c.post("/projects", json={"name": "Old pilot"}).json()["projectId"]
+        c.post(f"/projects/{pid}/documents", files=[("files", ("team.csv", CSV, "text/csv"))])
+        _wait_ready(c, pid)
+        root = tmp_path / "projects" / pid
+        assert root.exists()
+        r = c.delete(f"/projects/{pid}")
+        assert r.status_code == 200 and r.json()["deleted"] == pid
+        assert not root.exists()
+        assert all(p["projectId"] != pid for p in c.get("/projects").json()["projects"])
+        assert c.delete(f"/projects/{pid}").status_code == 404
+    # Nothing comes back after a restart.
+    with _client(tmp_path, monkeypatch) as c:
+        assert all(p["projectId"] != pid for p in c.get("/projects").json()["projects"])
+
+
+def test_delete_cannot_escape_the_data_dir(tmp_path, monkeypatch):
+    outside = tmp_path / "keep.txt"
+    outside.write_text("keep")
+    with _client(tmp_path, monkeypatch) as c:
+        assert c.delete("/projects/..").status_code == 404
+        assert c.delete("/projects/%2E%2E%2F").status_code in {404, 405}
+    assert outside.exists()

@@ -102,3 +102,13 @@ async def test_ask_fabricated_quote_downgrades(tmp_path):
     })
     finding = await WorkspaceAssistant(c, FakeLLM(canned)).ask("anything")
     assert finding.status == Status.needs_review and finding.evidence[0].verified is False
+
+
+async def test_delete_refuses_paths_outside_the_project_folder(tmp_path):
+    from core.workspace import Workspace
+    ws = Workspace(tmp_path)
+    (tmp_path / "projects").mkdir()
+    (tmp_path / "keep.txt").write_text("keep")
+    for bad in ("..", ".", "../..", "a/../.."):
+        assert await ws.delete(bad) is False
+    assert (tmp_path / "keep.txt").exists() and (tmp_path / "projects").exists()

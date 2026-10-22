@@ -1,0 +1,36 @@
+/* Sidebar layout: fits 720px-tall screens, scrolls when shorter, footer pinned to the bottom. */
+.dashboard-sidebar { padding: 18px 12px 12px; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+.dashboard-sidebar .sidebar-workspaces { margin: 14px 8px 0; padding: 8px 12px; justify-content: flex-start; gap: 9px; border-radius: 8px; font-size: 12px; font-weight: 650; letter-spacing: 0; background: transparent; color: var(--muted); box-shadow: none; border: 1px solid var(--border); }
+.dashboard-sidebar .sidebar-workspaces:hover { background: var(--surface-soft); color: var(--accent); }
+.dashboard-sidebar .sidebar-workspaces svg { width: 16px; height: 16px; }
+.dashboard-sidebar .sidebar-case-wrap { margin: 10px 8px 14px; }
+.dashboard-sidebar .sidebar-case { padding: 9px 10px; }
+.dashboard-sidebar nav { gap: 0; }
+.nav-group { display: flex; flex-direction: column; gap: 2px; }
+.nav-group + .nav-group { margin-top: 12px; }
+.nav-group > .sidebar-caption { padding: 0 12px; margin: 0 0 3px; font-size: 9px; letter-spacing: .14em; }
+.dashboard-sidebar .dashboard-nav-item { padding: 9px 12px; }
+.dashboard-sidebar .sidebar-bottom { margin-top: auto; padding: 14px 10px 0; }
+.dashboard-sidebar .sidebar-divider { margin: 0 2px 10px; }
+.dashboard-sidebar .sidebar-bottom p { display: flex; align-items: baseline; justify-content: space-between; gap: 8px; margin: 0; font-size: 11px; line-height: 1.4; }
+.dashboard-sidebar .sidebar-bottom p .sidebar-caption { font-size: 9px; letter-spacing: .14em; }
+.is-sidebar-collapsed .nav-group + .nav-group { margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--border); }
+.is-sidebar-collapsed .dashboard-sidebar .sidebar-workspaces { justify-content: center; padding: 8px 0; }
+/* Issues page tabs (To review / Decisions) */
+.issue-tabs { display: flex; gap: 6px; margin: 0 0 18px; border-bottom: 1px solid var(--border); }
+.issue-tabs button { display: inline-flex; align-items: center; gap: 7px; border: 0; border-bottom: 2px solid transparent; background: none; padding: 10px 4px; margin-right: 14px; color: var(--muted); font-size: 13px; font-weight: 600; }
+.issue-tabs button.active { color: var(--ink); border-bottom-color: var(--accent); }
+.issue-tabs em { font-style: normal; font-size: 11px; padding: 1px 7px; border-radius: 999px; background: var(--surface-soft); color: var(--muted); }
+.issue-tabs button.active em { background: var(--accent-soft); color: var(--accent); }
+.review-open { display: inline-flex; align-items: center; gap: 4px; margin-top: 8px; border: 0; background: none; padding: 0; color: var(--accent); font-size: 12px; }
+/* Overview: proposal draft entry point */
+.overview-links .overview-link-primary { grid-column: 1 / -1; border-color: var(--accent); background: var(--accent-soft); padding: 20px 22px; }
+.overview-links .overview-link-primary strong { font-size: 15px; }
+.overview-links .overview-link-primary > svg:first-child { color: var(--accent); }
+.calendar-undated { margin-top: 26px; }
+.calendar-undated > .dashboard-eyebrow { display: block; margin-bottom: 10px; }
+@media (min-width: 761px) {
+  /* Collapsed rail: no room for the footer text; the case date stays on the Overview heading. */
+  .is-sidebar-collapsed .dashboard-sidebar .sidebar-bottom p { display: none; }
+  .is-sidebar-collapsed .dashboard-sidebar .sidebar-case-wrap { margin: 10px auto 12px; }
+}

@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import asyncio
+import shutil
 import json
 import os
 import re
@@ -172,6 +173,24 @@ class Workspace:
                 self.projects[pid] = corpus
                 await corpus.load()
             return corpus
+
+    async def delete(self, project_id: str) -> bool:
+        """Remove a project and everything uploaded to it. Returns False if it never existed."""
+        pid = _SAFE.sub("_", project_id) or "default"
+        root = self.data_dir / pid
+        base = self.data_dir.resolve()
+        # "." and ".." pass the character filter; never delete anything but a project folder.
+        if pid in {".", ".."} or root.resolve().parent != base:
+            return False
+        async with self._lock:
+            corpus = self.projects.pop(pid, None)
+            if corpus is not None:
+                for task in list(corpus._tasks):
+                    task.cancel()
+            existed = corpus is not None or root.exists()
+            if root.exists():
+                await asyncio.to_thread(shutil.rmtree, root)
+        return existed
 
     async def create(self, name: str) -> ProjectCorpus:
         """Create (or fetch) a project from a human name, persisting the name."""
