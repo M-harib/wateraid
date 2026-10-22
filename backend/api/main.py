@@ -104,7 +104,7 @@ def create_app(*, core: Core | None = None, llm=None) -> FastAPI:
     app = FastAPI(title="Grant Compliance API", lifespan=lifespan)
     app.add_middleware(
         CORSMiddleware, allow_origins=_origins(),
-        allow_methods=["GET", "POST", "DELETE"], allow_headers=["*"],
+        allow_methods=["GET", "POST", "PATCH", "DELETE"], allow_headers=["*"],
         # pdf.js uses range requests; cross-origin it must read these to size/stream the PDF
         expose_headers=["Content-Range", "Accept-Ranges", "Content-Length"],
     )
@@ -201,6 +201,27 @@ def create_app(*, core: Core | None = None, llm=None) -> FastAPI:
             return JSONResponse({"detail": "name is required"}, status_code=400)
         corpus = await request.app.state.workspace.create(name)
         return {"projectId": corpus.project_id, "name": corpus.name}
+
+    @app.patch("/projects/{project_id}")
+    async def rename_project(project_id: str, request: Request):
+        """Change a project's display name. The id (URL, uploads, saved drafts) stays the same."""
+        body = await request.json()
+        name = " ".join(str((body or {}).get("name", "")).split())
+        if not name:
+            return JSONResponse({"detail": "name is required"}, status_code=400)
+        if len(name) > 120:
+            return JSONResponse({"detail": "name must be 120 characters or fewer"}, status_code=400)
+        corpus = await request.app.state.workspace.project(project_id)
+        await corpus.set_name(name)
+        return {"projectId": corpus.project_id, "name": corpus.name,
+                "documentCount": len(corpus.docs), "ready": corpus.ready()}
+
+    @app.delete("/projects/{project_id}")
+    async def delete_project(project_id: str, request: Request):
+        """Delete a project with its uploaded files. Bundled pack files are not affected."""
+        if not await request.app.state.workspace.delete(project_id):
+            return JSONResponse({"detail": "project not found"}, status_code=404)
+        return {"deleted": project_id, "projects": request.app.state.workspace.list_projects()}
 
     # --- per-project uploaded documents (PDF / Excel / CSV) ---
 
