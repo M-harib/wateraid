@@ -55,13 +55,13 @@ up: check-backend
 	@if lsof -ti:$(BE_PORT) -sTCP:LISTEN >/dev/null 2>&1; then \
 	  echo "backend already running on :$(BE_PORT)"; \
 	else \
-	  ( cd "$(CURDIR)/backend" && $(DETACH) $(UVICORN) api.main:app --host 127.0.0.1 --port $(BE_PORT) >"$(RUN)/be.log" 2>&1 </dev/null & ); \
+	  ( cd "$(CURDIR)/backend" && exec $(DETACH) $(UVICORN) api.main:app --host 127.0.0.1 --port $(BE_PORT) >"$(RUN)/be.log" 2>&1 </dev/null & ); \
 	  echo "backend  -> http://localhost:$(BE_PORT)  (log: .run/be.log)"; \
 	fi
 	@if lsof -ti:$(FE_PORT) -sTCP:LISTEN >/dev/null 2>&1; then \
 	  echo "frontend already running on :$(FE_PORT)"; \
 	else \
-	  ( cd "$(CURDIR)/frontend" && $(DETACH) npm run dev -- --port $(FE_PORT) --strictPort >"$(RUN)/fe.log" 2>&1 </dev/null & ); \
+	  ( cd "$(CURDIR)/frontend" && exec $(DETACH) npm run dev -- --port $(FE_PORT) --strictPort >"$(RUN)/fe.log" 2>&1 </dev/null & ); \
 	  echo "frontend -> http://localhost:$(FE_PORT)  (log: .run/fe.log)"; \
 	fi
 
