@@ -151,6 +151,7 @@ Team Reef:
 - [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) and [`docs/DECISIONS.md`](docs/DECISIONS.md)
 - [`docs/BRAND.md`](docs/BRAND.md): visual and voice guide
 - [`docs/HANDOFF.md`](docs/HANDOFF.md): change log with verification notes
+- [`docs/DEPLOY.md`](docs/DEPLOY.md): deploying the frontend to Vercel and the backend to Render
 - [`backend/tools/proposal/README.md`](backend/tools/proposal/README.md) and [`backend/tests/eval/README.md`](backend/tests/eval/README.md)
 
 ## License
