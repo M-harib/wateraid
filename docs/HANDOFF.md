@@ -180,6 +180,23 @@ Combine `main` (teammate's backend + proposal review, through `f6b342c`) with th
     - Calendar buttons, bounds, typing and legend.
     - All sections in light and dark, the collapsed rail, 0 px mobile overflow, no console errors.
 
+## Project README and DevPost submission (Claude), uncommitted on `main`
+- **New root `README.md`** for WaterAid staff, investors and new developers. It covers:
+  - Purpose, features, trust principles and a Mermaid architecture diagram (rendered and checked with Mermaid 11).
+  - Tech stack, setup (`make install` / `make up`), tests, project structure and the main API routes.
+  - Status and roadmap, team, and links to the deeper docs.
+- **Screenshots:** `docs/images/*.png`, seven real app screens at 2400×1600 (3:2, under 0.5 MB each), captured with Playwright from the running app.
+  - A "Taps for Rights" project with the 7 pack files was created in `backend/data/` for the evidence-workspace and Projects shots. It is gitignored and can be deleted from the Projects page.
+- **DevPost draft:** a shared Claude Doc, "GrantProof — DevPost submission", with paste-ready fields: name, pitch (169 characters), 18 tags, team, About in Markdown, gallery with captions, links, an optional LinkedIn post and a pre-posting checklist.
+- **Claims are held to the code:**
+  - No accuracy figure: the 25-question evaluation has 4 of 25 gold answers.
+  - The pitch deck's illustrative impact figures are left out.
+  - Planned work (requirements register, evidence tracking, accounts, pilot) is written as roadmap.
+- **Still to do:**
+  - Renew the OpenRouter key (currently 401), then capture the four AI screenshots listed in the doc.
+  - Add the Vercel link once deployed.
+  - Add each team member's DevPost account.
+
 ## Open issues (Claude)
 
 - **Backend, for the proposal owner:** "Cost Share Vs Call" failed in all 3 full runs (`tools/proposal/evidence.py` `cited_percentage` rejects quotes with zero or several percentages); the checklist failed once with "Response must be a finite JSON object"; checklist row count varies (14 vs 16). Every `/proposal/ask` is stored as a proposal finding, so writing-help requests appear as "Generic Qa" priority findings.
