@@ -69,7 +69,7 @@ export function BackendDocuments({ projectId, projectName, connected }: Props) {
 
   return <div className="project-documents">
     <nav className="documents-breadcrumb"><span>Project</span><strong>{projectName}</strong></nav>
-    {!connected && <div className="inline-error" role="alert">Connect the analysis service (set VITE_API_BASE_URL) to upload documents.</div>}
+    {!connected && <div className="inline-error" role="alert">Live AI analysis is switched off in this public demo. Uploads need the analysis service; the case documents are in the Evidence workspace.</div>}
     {(error || notice) && <div className={error ? 'inline-error' : 'draft-notice'} role={error ? 'alert' : 'status'}>{error || notice}</div>}
 
     <section className="documents-pane"
