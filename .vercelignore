@@ -1,0 +1,14 @@
+# Only the frontend and the bundled source pack are needed to build the site.
+# Never upload secrets, virtualenvs, or uploaded project data.
+.env
+.env.*
+**/.env
+**/.env.*
+.venv
+**/.venv
+backend/data
+data
+.run
+**/__pycache__
+**/node_modules
+design
