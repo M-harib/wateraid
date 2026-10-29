@@ -2,6 +2,8 @@
 
 **An evidence-first assistant for grant compliance.** GrantProof reads a grant's documents side by side (the funding call, the proposal, the contribution agreement, results reports, the logic model and the budget), flags what doesn't line up, and cites the exact page behind every finding. Staff make every decision.
 
+**Live demo:** [grant-proof.vercel.app](https://grant-proof.vercel.app/) (a public demo with the case documents, proposal editor and calendar; live AI analysis is switched off).
+
 ![GrantProof overview](docs/images/overview.png)
 
 > **Status:** working prototype, built for The Water Challenge (WaterAid Canada × The AI Fellowship × SOON × TMU), Challenge A6. "GrantProof" is a working name. The bundled case, Water Care's *Taps for Rights* project funded by Global Affairs Canada (GAC), is fictional training material seeded with deliberate errors. It is not real WaterAid activity.
